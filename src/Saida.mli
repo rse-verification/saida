@@ -19,10 +19,5 @@
  *  SPDX-License-Identifier: GPL-2.0+
  *)
 
-
-(*
-  This file is the main visitor of Saida that converts a program to input (harness function)
-  for tricera
-*)
 (** Saida plug−in.
 No function is exported. *)
