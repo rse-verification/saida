@@ -1,22 +1,3 @@
-(*Register the plugin to frama-c*)
-module Self = Plugin.Register
-  (struct
-    let name = "Saida"
-    let shortname = "saida"
-    let help = "Plug-in for inferring ACSL function contracts for helper functions"
-  end)
-
-
-(*option for setting the output-file*)
-(*TODO: use builtin -ocode instead*)
-module Output_file = Self.String
-  (struct
-    let option_name = "-saida-out"
-    let default = "saida_out.c"
-    let arg_name = "output_file"
-    let help = "File to save harness function for the contract"
-  end)
-
 (*option for setting the path to the tricera-binary*)
 (*
  * Copyright 2021 Scania CV AB
@@ -38,6 +19,27 @@ module Output_file = Self.String
  *
  *  SPDX-License-Identifier: GPL-2.0+
  *)
+
+(*Register the plugin to frama-c*)
+module Self = Plugin.Register
+  (struct
+    let name = "Saida"
+    let shortname = "saida"
+    let help = "Plug-in for inferring ACSL function contracts for helper functions"
+  end)
+
+
+(*option for setting the output-file*)
+(*TODO: use builtin -ocode instead*)
+module Output_file = Self.String
+  (struct
+    let option_name = "-saida-out"
+    let default = "saida_out.c"
+    let arg_name = "output_file"
+    let help = "File to save harness function for the contract"
+  end)
+
+
 
 module Tricera_path = Self.String
   (struct
