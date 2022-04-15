@@ -1,4 +1,4 @@
-# saida
+# Saida
 
 This program is licensed under the GPL2 license, see license headers in source code files
 and the full license in the LICENSE file.
