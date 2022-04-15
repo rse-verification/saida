@@ -1,0 +1,18 @@
+Saida.cmi :
+Saida.cmi :
+main.cmo : \
+    tricera2acsl.cmo \
+    saida_vis.cmo \
+    options_saida.cmo
+main.cmx : \
+    tricera2acsl.cmx \
+    saida_vis.cmx \
+    options_saida.cmx
+options_saida.cmo :
+options_saida.cmx :
+saida_vis.cmo :
+saida_vis.cmx :
+tricera2acsl.cmo : \
+    options_saida.cmo
+tricera2acsl.cmx : \
+    options_saida.cmx
