@@ -7,9 +7,9 @@ ACSL Contract inference for helper functions.
 Currently, working for Frama-C 23.1,not tested on v24.
 Please note that the plugin is experimental and no results are guaranteed.
 
-*Install TriCera*
-This plugin requires TriCera to be installed on your system:
-
+*Install TriCera*  
+This plugin requires TriCera to be installed on your system, see:  
+https://github.com/uuverifiers/tricera  
 
 
 *Register as plug-in using these commands (Ubuntu)*  
