@@ -4,8 +4,8 @@ This program is licensed under the GPL2 license, see license headers in source c
 and the full license in the LICENSE file.
 
 ACSL Contract inference for helper functions.
-Currently, working for Frama-C 23.1,not tested on v24.
-Please note that the plugin is experimental and no results are guaranteed.
+Developed for Frama-C v23.1 but also seems to work for v24.  
+Please note that the plugin is experimental and still under development so that no results are guaranteed.
 
 
 ## Install TriCera  
