@@ -189,9 +189,10 @@ class oldvarsinpostvisitor = object (self)
             (match lv.lv_origin with
               | Some(vi) ->
                 if inside_old_label then
-                  let old_name = old_name_struct_field lv toff in
+                  (* let old_name = old_name_struct_field lv toff in *)
+                  let old_name = ("old_" ^ logic_var_name lv) in
                   let old_vi = Cil.copyVarinfo vi old_name in
-                  Varinfo.Hashtbl.add old_vars old_vi vi;
+                  Varinfo.Hashtbl.add old_vars vi old_vi;
                 else ();
                 Cil.SkipChildren
               | None -> Cil.DoChildren)
@@ -532,6 +533,7 @@ let rec get_type_decl_string typ =
     | TInt(_, _) -> "int"
     | TComp(cinfo, _, _) -> Cil.compFullName cinfo
     | TPtr(inner_type, _) -> (get_type_decl_string inner_type) ^ " *"
+    | TNamed(tinfo, _) -> tinfo.torig_name
     | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
 
 let get_var_decl_string vi =
@@ -1090,7 +1092,23 @@ Cases:
   method! vterm_lval (tlh, toff) =
     match tlh with
       | TResult(_) ->
-        self#print_string self#result_string;
+        (* let () = self#print_string self#result_string in *)
+        let () = (match toff with
+          | TNoOffset -> () (** no further offset. *)
+          | TField (fi, toff') ->
+              (
+                let s =
+                  self#result_string ^ "." ^
+                  (String.concat "." (struct_fields_to_list toff))
+                in self#print_string s
+              )
+          (** access to the field of a compound type. *)
+          | TModel(_) -> self#print_string "model-field not supported"; (** access to a model field. *)
+          | TIndex(t, toff') ->
+              let _ = self#print_string self#result_string in
+              self#print_array_indexing toff;
+          )
+        in
         Cil.SkipChildren
       | TMem(t) ->
         (* self#incr_deref_lvl; *)
@@ -1116,7 +1134,8 @@ Cases:
                   Cil.SkipChildren
               | TField(finfo, toff') ->
                   let s = if inside_old_label && (Option.is_some lv.lv_origin) then
-                    old_name_struct_field lv toff
+                    (* old_name_struct_field lv toff *)
+                    "old_" ^ get_struct_repr lv toff
                   else
                     get_struct_repr lv toff
                   in
