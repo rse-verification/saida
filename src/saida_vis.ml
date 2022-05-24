@@ -29,6 +29,8 @@
 open Cil_types
 open Cil_datatype
 
+module IntSet = Set.Make(Int)
+
 
 (*Function name for initializing variables non-deterministically
   in TriCera. Currently only int or int* or struct/union supported *)
@@ -81,7 +83,7 @@ type harness_func = {
 
 and harness_block = {
     mutable called_func: string;
-    mutable old_var_inits: (varinfo * varinfo) list;
+    mutable old_var_inits: (varinfo * int) list;
     mutable log_vars: logic_var list;
 }
 
@@ -133,8 +135,36 @@ class oldvarsinpostvisitor = object (self)
   inherit Visitor.frama_c_inplace as super
   val mutable old_vars = Varinfo.Hashtbl.create 10
   val mutable inside_old_label = false
+  val mutable deref_lvl = 0
 
-  method old_vars = old_vars
+  method incr_deref_lvl = deref_lvl <- deref_lvl + 1
+  method decr_deref_lvl = deref_lvl <- deref_lvl - 1
+
+  method get_deref_lvl = deref_lvl
+
+
+  (*
+    Returns list vi i, where vi is variable used and i is how many levels
+    it is dereferenced WITHIN the old-context. e.g. **\old( **p ) -> (p, 2)
+  *)
+  method get_old_vars =
+    let pair_seq =
+      Seq.map
+      (fun (vi, iset) ->
+        let inner_pair_seq =
+          Seq.map
+            (fun i ->
+              (* let old_vi = Cil.copyVarinfo vi ("old_" ^ deref_in_old_str ^ vi.vorig_name) in
+              let new_vi = Cil.copyVarinfo vi (vi.vorig_name) in
+              (old_vi, new_vi, i) *)
+              (vi, i)
+            )
+          (IntSet.to_seq iset)
+        in List.of_seq inner_pair_seq
+      )
+      (Varinfo.Hashtbl.to_seq old_vars)
+    in
+    List.concat (List.of_seq pair_seq)
 
   method enter_old_label =
     let prev_label = inside_old_label in
@@ -143,12 +173,26 @@ class oldvarsinpostvisitor = object (self)
 
   method restore_old_label prev_label = inside_old_label <- prev_label;
 
+  method get_old_label = inside_old_label
+
+  method add_vi vi =
+    Options_saida.Self.feedback "deref_lvl: %d" self#get_deref_lvl;
+    (* let deref_string = String.make self#get_deref_lvl '*' in *)
+    (* let old_vi = Cil.copyVarinfo vi ("old_" ^ vi.vorig_name) in
+    let new_vi = Cil.copyVarinfo vi vi.vorig_name in *)
+    match Varinfo.Hashtbl.find_opt old_vars vi with
+      | Some(iset) -> Varinfo.Hashtbl.replace old_vars vi
+                        (IntSet.add self#get_deref_lvl iset)
+      | None -> Varinfo.Hashtbl.add old_vars vi
+                  (IntSet.singleton self#get_deref_lvl);
+
+    (* Varinfo.Hashtbl.add old_vars vi self#get_deref_lvl *)
+    (* old_vars new_vi (old_vi, self#get_deref_lvl); *)
+
   method! vlogic_var_use lv =
-    let _ = match (inside_old_label, lv.lv_origin) with
+    let _ = match (self#get_old_label, lv.lv_origin) with
       | true, Some(vi) ->
-        let old_vi = Cil.copyVarinfo vi ("old_" ^ vi.vorig_name) in
-        Varinfo.Hashtbl.replace old_vars vi old_vi;
-        (*replace instead of add - dirty fix to avoid duplicate entries*)
+        let _ = self#add_vi vi in ()
       | _ -> ()
     in
       Cil.SkipChildren
@@ -167,33 +211,40 @@ class oldvarsinpostvisitor = object (self)
   method! vterm_node tn =
       match tn with
         | Tat(t, ll) ->
-          if is_old_or_pre_logic_label ll then
+          let () = if is_old_or_pre_logic_label ll then
             let prev_label = self#enter_old_label in
             let _ = Cil.visitCilTerm (self :> Cil.cilVisitor) t in
             self#restore_old_label prev_label;
-          else ();
-          Cil.DoChildren
+          else ()
+          in
+          Cil.SkipChildren
         | _ -> Cil.DoChildren
 
   method! vterm_lval (tlh, toff) =
     match tlh with
       | TResult(t) -> Cil.DoChildren
       | TMem(t) ->
-        (* self#incr_deref_lvl; *)
-        (* ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
-        (* self#decr_deref_lvl; *)
-        Cil.DoChildren
+        let () = if self#get_old_label then
+          let () = self#incr_deref_lvl in
+          let _ = Cil.visitCilTerm (self :> Cil.cilVisitor) t in
+          self#decr_deref_lvl;
+        else
+          let _ = Cil.visitCilTerm (self :> Cil.cilVisitor) t in ()
+        in
+        Cil.SkipChildren
       | TVar(lv) ->
         match toff with
           | TField(finfo, toff') ->
             (match lv.lv_origin with
               | Some(vi) ->
-                if inside_old_label then
+                let () = if inside_old_label then
                   (* let old_name = old_name_struct_field lv toff in *)
-                  let old_name = ("old_" ^ logic_var_name lv) in
-                  let old_vi = Cil.copyVarinfo vi old_name in
-                  Varinfo.Hashtbl.add old_vars vi old_vi;
-                else ();
+                  (* self#add_vi_pair vi *)
+                  (* let old_name = ("old_" ^ logic_var_name lv) in *)
+                  (* let old_vi = Cil.copyVarinfo vi old_name in *)
+                  let _ = self#add_vi vi in ()
+                else ()
+                in
                 Cil.SkipChildren
               | None -> Cil.DoChildren)
           | _ -> Cil.DoChildren
@@ -210,12 +261,12 @@ let make_harness_block f_name old_vars log_vars =
     List.map
       (fun (vi, old_vi) -> create_old_init_instr vi old_vi)
       (List.combine c_var_list old_var_list) *)
-  let old_var_pairs = List.of_seq (Varinfo.Hashtbl.to_seq old_vars) in
-  let old_var_pairs = List.map (fun (a,b) -> (b,a)) old_var_pairs in
+  (* let old_var_pairs = List.of_seq (Varinfo.Hashtbl.to_seq old_vars) in
+  let old_var_pairs = List.map (fun (a,b) -> (b,a)) old_var_pairs in *)
   (* List.combine c_var_list old_var_list *)
   {
     called_func = f_name;
-    old_var_inits = old_var_pairs;
+    old_var_inits = old_vars;
     log_vars = log_vars;
   }
 
@@ -416,7 +467,7 @@ let make_harness_func f_svar behavs =
             ((old_visitor) :> Visitor.frama_c_inplace)
             (Ast.get ())
   in
-  let old_vars = old_visitor#old_vars in
+  let old_vars = old_visitor#get_old_vars in
   (*TODO: Fix so that it can deal with different behaviors*)
   let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
   (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
@@ -528,6 +579,12 @@ let unop_to_string uop =
     | BNot -> "~"
     | LNot -> "!"
 
+let get_vi_use_string vi = vi.vorig_name
+
+let rec repeat_str str n =
+  if n = 0 then ""
+  else str ^ (repeat_str str (n-1))
+
 let rec get_type_decl_string typ =
   match typ with
     | TInt(_, _) -> "int"
@@ -538,6 +595,21 @@ let rec get_type_decl_string typ =
 
 let get_var_decl_string vi =
   let type_string = get_type_decl_string vi.vtype in
+  Printf.sprintf "%s %s;" type_string vi.vname
+
+(*special case where i first levels of derefs are not counted*)
+let rec get_type_decl_string_2 typ i =
+  match typ with
+    | TInt(_, _) -> "int"
+    | TComp(cinfo, _, _) -> Cil.compFullName cinfo
+    | TPtr(inner_type, _) ->
+      let s = if i > 0 then "" else " *" in
+      (get_type_decl_string_2 inner_type (i-1)) ^ s
+    | TNamed(tinfo, _) -> tinfo.torig_name
+    | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
+
+let get_var_decl_string_2 vi i =
+  let type_string = get_type_decl_string_2 vi.vtype i in
   Printf.sprintf "%s %s;" type_string vi.vname
 
 let get_logic_var_decl_string lv =
@@ -653,8 +725,10 @@ class acsl2tricera out = object (self)
 
   val mutable let_var_defs = Logic_var.Hashtbl.create 10
 
-  method incr_deref_level = deref_lvl <- deref_lvl + 1;
-  method infr_deref_lvl = deref_lvl <- if deref_lvl <= 0 then 0 else deref_lvl - 1;
+  method incr_deref_lvl = deref_lvl <- deref_lvl + 1;
+  method decr_deref_lvl = deref_lvl <- if deref_lvl <= 0 then 0 else deref_lvl - 1;
+
+  method get_deref_lvl = deref_lvl
 
   method incr_indent = indent <- indent + 1;
   method dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
@@ -806,17 +880,27 @@ class acsl2tricera out = object (self)
       (fun ins -> self#print_indent; Format.fprintf out "%a\n" Printer.pp_instr ins)
       hf.block.old_var_inits; *)
   method print_old_var_inits hf =
-  if (List.length hf.block.old_var_inits) > 0 then
-    self#print_line "//Initialization of logical old-variables";
-  List.iter
-    (fun (old_var, _) -> self#print_line (get_var_decl_string old_var))
-    hf.block.old_var_inits;
-  List.iter
-    (
-      fun (old_var, var) ->
-        self#print_line (Printf.sprintf "assume(%s == %s);" old_var.vname var.vname)
-    )
-    hf.block.old_var_inits;
+    let () = if (List.length hf.block.old_var_inits) > 0 then
+      self#print_line "//Initialization of logical old-variables";
+    in
+    let get_old_vi vi' i =
+      let deref_str = repeat_str "ptr_" i in
+      Cil.copyVarinfo vi' ("old_" ^ deref_str ^ vi'.vorig_name) in
+    List.iter
+      (fun (vi, i) ->
+        let decl_str = get_var_decl_string_2 (get_old_vi vi i) i in
+        self#print_line decl_str;
+      )
+      hf.block.old_var_inits;
+    List.iter
+      (
+        fun (vi, i) ->
+          let orig_deref_str = String.make i '*' in
+          let old_var = (get_old_vi vi i) in
+          self#print_line (Printf.sprintf "assume(%s == %s);"
+            (old_var.vname) (orig_deref_str^vi.vname))
+      )
+      hf.block.old_var_inits;
 
 
   method print_require_assumes hf =
@@ -1111,9 +1195,14 @@ Cases:
         in
         Cil.SkipChildren
       | TMem(t) ->
-        (* self#incr_deref_lvl; *)
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        (* self#decr_deref_lvl; *)
+        let () = if inside_old_label then
+          let () = self#incr_deref_lvl in
+          let _ =  Cil.visitCilTerm (self :> Cil.cilVisitor) t in
+          self#decr_deref_lvl;
+        else
+          let () = self#print_string "*" in
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        in
         Cil.SkipChildren
       | TVar(lv) ->
           (* first, check if it is a let-variable *)
@@ -1178,13 +1267,15 @@ Cases:
       | Some vi -> self#print_string (self#get_varinfo_string inside_old_label);
       | None -> self#print_string self#get_logic_var_string;
     in *)
-  (*Note: If they are logical variables without origin, we assume that they are
-  e.g. bounded quantified variables and therefore should not have old prefix*)
-  let s = match (inside_old_label, lv.lv_origin) with
-    | true, Some(vi) -> "old_" ^ vi.vorig_name
-    | false, Some(vi) -> vi.vorig_name
-    | _, None -> lv.lv_name
-  in
-    self#print_string s;
-    Cil.SkipChildren
+    (*Note: If they are logical variables without origin, we assume that they are
+    e.g. bounded quantified variables and therefore should not have old prefix*)
+    let s = match (inside_old_label, lv.lv_origin) with
+      | true, Some(vi) ->
+        let deref_str = repeat_str "ptr_" self#get_deref_lvl in
+        "old_" ^ deref_str ^ (get_vi_use_string vi)
+      | false, Some(vi) -> get_vi_use_string vi
+      | _, None -> lv.lv_name
+    in
+      self#print_string s;
+      Cil.SkipChildren
 end
