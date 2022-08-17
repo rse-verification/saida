@@ -38,7 +38,7 @@ let rec non_det_func_name typ =
   match typ with
     | TInt(_, _) -> "non_det_int"
     | TPtr(inner_typ, _) -> (non_det_func_name inner_typ) ^ "_ptr"
-    | TComp(cinfo, _, _) ->  (*union or struct*)
+    | TComp(cinfo, _) ->  (*union or struct*)
       let cfull =  (Cil.compFullName cinfo) in
       let clist = Str.split (Str.regexp "[ \t]+") cfull in
       "non_det_" ^ (String.concat "_" clist)
@@ -52,7 +52,7 @@ let rec non_det_func_decl_help typ =
     | TInt(_, _) -> "int"
     | TPtr(inner_typ, _) -> (non_det_func_decl_help inner_typ) ^ "*"
     | TEnum(einfo, _) -> "enum " ^ einfo.eorig_name
-    | TComp(cinfo, _, _) -> (Cil.compFullName cinfo)
+    | TComp(cinfo, _) -> (Cil.compFullName cinfo)
     | TNamed(tinfo, _) -> tinfo.torig_name
     | _ -> "Non-supported-type-for-non-det"
 
@@ -554,7 +554,7 @@ let rel_to_string rel =
 (*Borrowed from Cil_printer.ml*)
 let binop_to_string binop =
   match binop with
-         | PlusA | PlusPI | IndexPI -> "+"
+         | PlusA | PlusPI -> "+"
          | MinusA | MinusPP | MinusPI -> "-"
          | Mult -> "*"
          | Div -> "/"
@@ -588,7 +588,7 @@ let rec repeat_str str n =
 let rec get_type_decl_string typ =
   match typ with
     | TInt(_, _) -> "int"
-    | TComp(cinfo, _, _) -> Cil.compFullName cinfo
+    | TComp(cinfo, _) -> Cil.compFullName cinfo
     | TPtr(inner_type, _) -> (get_type_decl_string inner_type) ^ " *"
     | TNamed(tinfo, _) -> tinfo.torig_name
     | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
@@ -601,7 +601,7 @@ let get_var_decl_string vi =
 let rec get_type_decl_string_2 typ i =
   match typ with
     | TInt(_, _) -> "int"
-    | TComp(cinfo, _, _) -> Cil.compFullName cinfo
+    | TComp(cinfo, _) -> Cil.compFullName cinfo
     | TPtr(inner_type, _) ->
       let s = if i > 0 then "" else " *" in
       (get_type_decl_string_2 inner_type (i-1)) ^ s
@@ -1178,7 +1178,7 @@ Cases:
       | TResult(_) ->
         (* let () = self#print_string self#result_string in *)
         let () = (match toff with
-          | TNoOffset -> () (** no further offset. *)
+          | TNoOffset -> self#print_string self#result_string (** no further offset. *)
           | TField (fi, toff') ->
               (
                 let s =
