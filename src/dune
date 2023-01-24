@@ -1,7 +1,7 @@
 ( library
  ( name Saida)
  ( public_name frama-c-saida.core)
- ( flags -open Frama_c_kernel :standard)
+ ( flags -open Frama_c_kernel (:standard -w -50 -w -6 -w -27 -w -39 -w -36))
  ( libraries frama-c.kernel)
 )
 
