@@ -320,7 +320,7 @@ let rec bounded_vars_term term =
       Logic_var.Set.empty t
   | Tlambda(prms,expr) ->
     Logic_var.Set.union
-      (List.fold_left (Extlib.swap Logic_var.Set.add) Logic_var.Set.empty prms)
+      (List.fold_left (Fun.flip Logic_var.Set.add) Logic_var.Set.empty prms)
       (bounded_vars_term expr)
   | Trange(i1,i2) ->
     let fv = match i1 with
@@ -443,7 +443,7 @@ and bounded_vars_predicate p = match p.pred_content with
 
   | Pforall (lvs,p) | Pexists (lvs,p) ->
       List.fold_left
-        (Extlib.swap Logic_var.Set.add) (bounded_vars_predicate p) lvs
+        (Fun.flip Logic_var.Set.add) (bounded_vars_predicate p) lvs
 
 
 let logic_vars_from_pred pred =
