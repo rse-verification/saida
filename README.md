@@ -16,23 +16,27 @@ https://github.com/uuverifiers/tricera
 ## Install and run Saida
 
 * Installation:  
-Register as plug-in using these commands (Ubuntu)
+Register as plug-in using these commands (Ubuntu):
+
+	* For Frama-C version <= 25:
 ```make; make install```
+	* For Frama-C version 26 and onward:
+```dune build @install && dune install```
 
 * Execution:  
 Run the plugin on file test.c as: 
-```frama-c -saida -tri-path <path-to-tri> test.c```  
-where path-to-tri is the path to the TriCera executable (tri). If no path is provided, defaults to `~/Documents/tricera/tri`
+```frama-c -saida -saida-tricera-path <path-to-tricera> test.c```  
+where path-to-tricera is the path to the TriCera executable (tri). If no path is provided, defaults to `~/Documents/tricera/tri`
 
 * Lib-entry option:  
 Optionally, use the Frama-C lib-entry option to non-deterministically assign all global
   variables in TriCera before analysis, e.g.:  
-```frama-c -saida test.c -tri-path <path-to-tri> -lib-entry```
+```frama-c -saida test.c -saida-tricera-path <path-to-tricera> -lib-entry```
 
 * Verification option:  
 Use the *-saida-wp* option for running the -wp plugin to verify the inferred contracts and verify that the top-level
   contract for the main function can be verified by relying on inferred contract, use as:  
-  ```frama-c -saida -tri-path <path-to-tri> -saida-wp test.c```
+  ```frama-c -saida -saida-tricera-path <path-to-tricera> -saida-wp test.c```
 
 
 ## Limitations
