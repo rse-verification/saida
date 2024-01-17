@@ -1,13 +1,11 @@
-( library
- ( name Saida)
- ( public_name frama-c-saida.core)
- ( flags -open Frama_c_kernel (:standard -w -50 -w -6 -w -27 -w -39 -w -36))
- ( libraries frama-c.kernel)
-)
+(library
+ (name Saida)
+ (public_name frama-c-saida.core)
+ (flags -open Frama_c_kernel :standard -w -50-6-27-39-36)
+ (libraries frama-c.kernel))
 
 (plugin
- ( optional )
- ( name saida)
- ( libraries frama-c-saida.core)
- ( site (frama-c plugins))
-)
+ (optional)
+ (name saida)
+ (libraries frama-c-saida.core)
+ (site (frama-c plugins)))
