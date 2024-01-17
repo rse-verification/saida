@@ -1,0 +1,7 @@
+_build
+*~
+\#*\#
+.vscode/
+.#*
+.dune.lock
+.dune-stamp
