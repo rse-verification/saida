@@ -44,7 +44,7 @@ module Output_file = Self.String
 module Tricera_path = Self.String
   (struct
     let option_name = "-saida-tricera-path"
-    let default = "~/Documents/tricera/tri"
+    let default = "tri"
     let arg_name = "output_file"
     let help = "Sets the path to the TriCera executable"
   end)
