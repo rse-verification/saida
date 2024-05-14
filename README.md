@@ -3,9 +3,11 @@
 This program is licensed under the GPL2 license, see license headers in source code files
 and the full license in the LICENSE file.
 
-ACSL Contract inference for helper functions.
-Developed for Frama-C v23.1 but also seems to work for Frama-C versions <= 28.1.
-Please note that the plugin is experimental and still under development so that no results are guaranteed.
+This is a plugin for Frama-C. Given ab entry-point function with an ACSL contract, it infers
+ACSL contracts for helper functions, i.e. functions further down the call tree. It was
+originally developed for Frama-C v23.1 but has been tested with Frama-C versions <= 28.1.
+Please note that the plugin is experimental and still under development so that no results
+are guaranteed.
 
 
 ## Install TriCera  
@@ -52,9 +54,9 @@ The plugin is currently limited to programs/specifications following these rules
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  
 
 ## *Summary*  
-The execution of the plugin can be summarized as:    
+The execution of the plugin can be summarized as:  
 Step 1: convert the top-level contract to a TriCera harness function  
-Step 2: Merge the harness function with the source code  
+Step 2: Merge the harness function with the source code (this result is stored in `tmp_harness_source_merged.c`)  
 Step 3: Run tricera on the result from step 2  
-Step 4: Merge the inferred contracts from step 3 with the source code  
+Step 4: Merge the inferred contracts from step 3 with the source code (this result is stored in `tmp_inferred_source_merged.c`)  
 Step 5: (optional) Run the wp plugin on the result from step 4
