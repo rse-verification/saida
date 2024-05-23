@@ -1015,7 +1015,11 @@ class acsl2tricera out = object (self)
             | TVoid _ -> ""
             | _ -> (get_type_decl_string hf.return_type) ^ " " ^ self#result_string ^ " = "
           in
-          self#print_line (s ^ "main2("^ params ^");\n");
+          let fname = curr_func.svar.vname in
+          if fname = "main" then
+            self#print_line (s ^ "main2("^ params ^");\n")
+          else
+            self#print_line (s ^ fname ^ "("^ params ^");\n");
         | None -> ();
     in
     (*Print the asserts, from the post-cond*)
