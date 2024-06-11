@@ -291,7 +291,7 @@ let rec bounded_vars_term term =
   | TSizeOfE t
   | TAlignOfE t
   | TUnOp (_,t)
-  | TCastE (_,t)
+  | TCast (_,_,t)
   | Tat (t,_)
   | Toffset (_,t)
   | Tbase_addr (_,t)
@@ -363,7 +363,7 @@ let rec bounded_vars_term term =
     let b_bv = bounded_vars_term b
     in
     Logic_var.Set.union d_bv b_bv
-  | TLogic_coerce(_,t) -> bounded_vars_term t
+  (* | TLogic_coerce(_,t) -> bounded_vars_term t *)
 
 
 and bounded_vars_lval (h,o) =
@@ -635,7 +635,7 @@ let term_node_debug_print out tn =
         | TAlignOfE (_) -> Format.fprintf out "5" (** alignment of the type of an expression. *)
         | TUnOp (_, _) -> Format.fprintf out "6" (** unary operator. *)
         | TBinOp (_, _, _) -> Format.fprintf out "7" (** binary operators. *)
-        | TCastE (_, _) -> Format.fprintf out "8" (** cast to a C type. *)
+        | TCast (_,_, _) -> Format.fprintf out "8" (** cast to a C type. *)
         | TAddrOf (_) -> Format.fprintf out "9" (** address of a term. *)
         | TStartOf (_) -> Format.fprintf out "10" (** beginning of an array. *)
 
@@ -653,7 +653,7 @@ let term_node_debug_print out tn =
         | Toffset (_, _) -> Format.fprintf out "17" (** offset from the base address of a pointer. *)
         | Tblock_length (_, _) -> Format.fprintf out "18" (** length of the block pointed to by the term. *)
         | Tnull -> Format.fprintf out "19"(** the null pointer. *)
-        | TLogic_coerce (lt, term) -> Format.fprintf out "19";
+        (* | TLogic_coerce (lt, term) -> Format.fprintf out "19"; *)
           (* logic_type_to_tla out lt *)
         (** implicit conversion from a C type to a logic type.
             The logic type must not be a Ctype. In particular, used to denote
@@ -998,8 +998,8 @@ class acsl2tricera out = object (self)
 
     (*Print assumes for special ghost-var ensures*)
     (*experimental feature*)
-    self#print_special_ghost_ensure_assumes hf;
-    self#print_newline;
+    (* self#print_special_ghost_ensure_assumes hf;
+    self#print_newline; *)
 
     (*Print the function call to the function we are harness for*)
     self#print_line "//Function call that the harness function verifies";
@@ -1142,8 +1142,8 @@ class acsl2tricera out = object (self)
         | TDataCons(lci, terms) ->
           self#print_string "logic_sum_types_not_supported"
           (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
-        | TLogic_coerce (_, t) ->
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        (* | TLogic_coerce (_, t) ->
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
         | Tat(t, ll) ->
           if is_old_or_pre_logic_label ll then
             begin
@@ -1155,7 +1155,7 @@ class acsl2tricera out = object (self)
             begin
               self#print_string "Currently only old/pre logic labels supported" ;
             end
-        | TCastE(_, t) ->
+        | TCast(_, _, t) ->
           ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
         | Tlet(b, t) ->
           self#add_let_var_def b;
