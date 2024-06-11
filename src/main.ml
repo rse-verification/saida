@@ -171,4 +171,4 @@ let run () =
     let msg = Printexc.to_string exc in
       Printf.eprintf "There was an error: %s\n" msg
 
-let () = Db.Main.extend run
+let () = Boot.Main.extend run
