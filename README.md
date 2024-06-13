@@ -24,6 +24,7 @@ Register as plug-in using these commands (Ubuntu):
 ```make; make install```
 	* For Frama-C version 26 and onward:
 ```dune build @install && dune install```
+	* NOTE: For Frama-C version >= 29: Use branch framac29
 
 * Execution:  
 Run the plugin on file test.c as: 
