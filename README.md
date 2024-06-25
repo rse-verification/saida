@@ -50,7 +50,12 @@ The plugin is currently limited to programs/specifications following these rules
 * Any non-main function should _not_ contain a contract.
   I.e., only 1 contract allowed in the file.
 * The non-main functions has to be called somewhere from within the file
-* Currently does not work for arrays or floats.
+* Currently does not support arrays, floating points, or stack pointers.
+* Heap pointers are generally supported (but bugs exist in some cases in the translation to ACSL).
+* Does not support inference of contracts for functions with local static variables.
+* In the ACSL contract, only ensures and requires clauses over C expressions are support, with the exception of certain uses of quantification: universal quantification is supported in the post-conditions, and existential quantification in the pre-condition. 
+  Other types of ACSL built-in or user defined constructs, such as logical functions and predicates, are not supported.
+  
 
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  
 
