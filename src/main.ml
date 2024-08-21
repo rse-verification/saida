@@ -34,9 +34,19 @@ let fn_regex = Str.regexp
       ("^\\(\\(void\\)\\|\\(int\\)\\|\\(float\\)\\|\\(double\\)\\|"
       ^ "\\(enum [a-zA-Z_][a-zA-Z0-9_]*\\)\\|\\(struct [a-zA-Z_][0-9a-zA-Z_]*\\)\\) (.*)$?")
 let main_regex = Str.regexp ".*main.*(.*)$?"
+let entry_regex () = Str.regexp ".*entry.*(.*)$?"
 
-
-
+let get_fn_name s =
+  (* Scanf.sscanf s "%s %s()%s" (fun _ x _ -> x) *)
+  let m = Str.string_match (Str.regexp {|.* \(.+\)(.*).*|}) s 0 in
+  if m = true then
+    (
+      Str.matched_group 1 s
+      )
+  else
+    (
+    Kernel.fatal "Dummy"
+    )
 
 (*Returns the fundef starting at line-nr n,
   returns none if line n is not the start of a fundef
@@ -68,9 +78,20 @@ let rec add_contract_annots ic buff in_acsl line fn_list =
               else
               (match line_to_fun_def line fn_list with
                 | Some _ ->
-                  if (Str.string_match main_regex s' 0) then
+                  let name = get_fn_name s' in
+                  (* if (Str.string_match main_regex s' 0) then *)
+                  if name = "main" then
                     ((Str.replace_first (Str.regexp "main") "main2" s) ^ "\n", false)
-                  else ("/*@contract@*/\n" ^ s ^ "\n", false)
+                  else
+                    (Self.feedback "%s" s';
+                    (* if (Str.string_match (entry_regex ()) s' 0) |> not then *)
+                    Self.feedback "name:%s %s" name (Kernel.MainFunction.get ());
+                    if not(name = Kernel.MainFunction.get ()) then
+                      (
+                      ("/*@contract@*/\n" ^ s ^ "\n", false)
+                      )
+                    else
+                      (s,false))
                 | None ->
                     if (Str.string_match ghost_regex s 0) then
                       ((Str.replace_first (Str.regexp "//@ ghost") "" s) ^ " //from ghost code\n", false)
@@ -106,7 +127,7 @@ let rec add_inferred_to_source ic buff ht line fn_list =
               | Some clist ->
                 List.iter (fun r -> Buffer.add_string buff (r ^ "\n")) clist;
               | None ->
-                if (name <> "main") then
+                if (name <> (Kernel.MainFunction.get ())) then
                   Buffer.add_string buff ("//No inferred contract found for " ^ name ^ "\n")
                 else ()
             )

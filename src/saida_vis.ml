@@ -526,7 +526,7 @@ let make_harness_func f_svar behavs =
   in
   {
     (* name = Printf.sprintf "%s_harness" f_name; *)
-    name = Kernel.MainFunction.get ();
+    name = "main";
     block = h_block;
     assumes = assumes;
     asserts = asserts;
