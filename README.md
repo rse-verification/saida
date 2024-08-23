@@ -1,6 +1,6 @@
 # Saida
 
-[![Build Status](https://github.com/rse-verification/saida/actions/workflows/build.yml)](https://github.com/rse-verification/saida/actions/workflows/build.yml/badge.svg?branch=main)
+[![Build Status](https://github.com/rse-verification/saida/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/rse-verification/saida/actions/workflows/build.yml)
 
 This program is licensed under the GPL2 license, see license headers in source code files
 and the full license in the LICENSE file.
