@@ -1,5 +1,7 @@
 # Saida
 
+[![Build Status](https://github.com/rse-verification/saida/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/rse-verification/saida/actions/workflows/build.yml)
+
 This program is licensed under the GPL2 license, see license headers in source code files
 and the full license in the LICENSE file.
 
@@ -20,6 +22,7 @@ https://github.com/uuverifiers/tricera
 * Installation:  
 Register as plug-in using these commands (Ubuntu):
 ```dune build @install && dune install```
+	* NOTE: For Frama-C version >= 29: Use branch framac29
 
 * Execution:  
 Run the plugin on file test.c as: 
@@ -46,7 +49,12 @@ The plugin is currently limited to programs/specifications following these rules
 * Any non-main function should _not_ contain a contract.
   I.e., only 1 contract allowed in the file.
 * The non-main functions has to be called somewhere from within the file
-* Currently does not work for arrays or floats.
+* Currently does not support arrays, floating points, or stack pointers.
+* Heap pointers are generally supported (but bugs exist in some cases in the translation to ACSL).
+* Does not support inference of contracts for functions with local static variables.
+* In the ACSL contract, only ensures and requires clauses over C expressions are support, with the exception of certain uses of quantification: universal quantification is supported in the post-conditions, and existential quantification in the pre-condition. 
+  Other types of ACSL built-in or user defined constructs, such as logical functions and predicates, are not supported.
+  
 
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  
 
