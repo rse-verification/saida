@@ -12,8 +12,8 @@ homepage: "https://github.com/rse-verification/saida"
 bug-reports: "https://github.com/rse-verification/saida/issues"
 depends: [
   "dune" {>= "3.2"}
-  "ocaml" {>= "4.14"}
-  "frama-c" {>= "26" & < "29"}
+  "ocaml" {>= "4.13.1"}
+  "frama-c" {>= "29"}
   "odoc" {with-doc}
 ]
 build: [

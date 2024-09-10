@@ -6,13 +6,13 @@ This program is licensed under the GPL2 license, see license headers in source c
 and the full license in the LICENSE file.
 
 This is a plugin for Frama-C. Given ab entry-point function with an ACSL contract, it infers
-ACSL contracts for helper functions, i.e. functions further down the call tree. It was
-originally developed for Frama-C v23.1 but has been tested with Frama-C versions <= 28.1.
+ACSL contracts for helper functions, i.e. functions further down the call tree. Current version
+has been tested with Frama-C v29.
 Please note that the plugin is experimental and still under development so that no results
 are guaranteed.
 
 
-## Install TriCera  
+## Install TriCera
 This plugin requires TriCera to be installed on your system, see:  
 https://github.com/uuverifiers/tricera  
 
@@ -21,17 +21,14 @@ https://github.com/uuverifiers/tricera
 
 * Installation:  
 Register as plug-in using these commands (Ubuntu):
-
-	* For Frama-C version <= 25:
-```make; make install```
-	* For Frama-C version 26 and onward:
 ```dune build @install && dune install```
 	* NOTE: For Frama-C version >= 29: Use branch framac29
 
 * Execution:  
 Run the plugin on file test.c as: 
 ```frama-c -saida -saida-tricera-path <path-to-tricera> test.c```  
-where path-to-tricera is the path to the TriCera executable (tri). If no path is provided, defaults to `~/Documents/tricera/tri`
+where path-to-tricera is the path to the TriCera executable (tri). If no path is
+provided, the plugin will use `tri` in `$PATH`.
 
 * Lib-entry option:  
 Optionally, use the Frama-C lib-entry option to non-deterministically assign all global
