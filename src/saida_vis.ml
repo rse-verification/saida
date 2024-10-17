@@ -176,7 +176,7 @@ class oldvarsinpostvisitor = object (self)
   method get_old_label = inside_old_label
 
   method add_vi vi =
-    Options_saida.Self.feedback "deref_lvl: %d" self#get_deref_lvl;
+    Options_saida.Self.debug ~level:3 "deref_lvl: %d" self#get_deref_lvl;
     (* let deref_string = String.make self#get_deref_lvl '*' in *)
     (* let old_vi = Cil.copyVarinfo vi ("old_" ^ vi.vorig_name) in
     let new_vi = Cil.copyVarinfo vi vi.vorig_name in *)

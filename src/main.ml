@@ -83,9 +83,8 @@ let rec add_contract_annots ic buff in_acsl line fn_list =
                   if name = "main" then
                     ((Str.replace_first (Str.regexp "main") "main2" s) ^ "\n", false)
                   else
-                    (Self.feedback "%s" s';
                     (* if (Str.string_match (entry_regex ()) s' 0) |> not then *)
-                    Self.feedback "name:%s %s" name (Kernel.MainFunction.get ());
+                    Self.debug ~level:3 "name:%s %s" name (Kernel.MainFunction.get ());
                     if not(name = Kernel.MainFunction.get ()) then
                       (
                       ("/*@contract@*/\n" ^ s ^ "\n", false)
