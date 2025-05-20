@@ -38,7 +38,7 @@ let entry_regex () = Str.regexp ".*entry.*(.*)$?"
 
 let get_fn_name s =
   (* Scanf.sscanf s "%s %s()%s" (fun _ x _ -> x) *)
-  let m = Str.string_match (Str.regexp {|.* \(.+\)(.*).*|}) s 0 in
+  let m = Str.string_match (Str.regexp {|.* \(.+\)(.*\($\|).*\)|}) s 0 in
   if m = true then
     (
       Str.matched_group 1 s
