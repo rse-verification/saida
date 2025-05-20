@@ -44,21 +44,11 @@ let run_tricera tri_path =
   Sys.command cmd_str
 
 (*Assume contract for function foo starts with line: is of form
-/* contracts for foo */
+/* contracts for foo */ or /* contract for foo */
 *)
 let contracts_regex = Str.regexp "/\\* contracts? for \\([a-zA-Z_][0-9a-zA-Z_]*\\) \\*/"
 let acsl_start_regex = Str.regexp "/\\*@$?"
 let acsl_end_regex = Str.regexp ".*\\*/$?"
-
-(*Assume contract for function foo starts with line: is of form
-/* contracts for foo */
-*)
-(*
-let contracts_start_to_name s =
-  let s' = Str.replace_first (Str.regexp "/\\* contract for") "" s in
-  let s' = Str.replace_first (Str.regexp "\\*/") "" s' in
-  String.trim s'
-*)
 
 (*Looks for function name in a comment on the form: 
   '/* contract for <functionn-name> */'
