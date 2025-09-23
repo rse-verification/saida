@@ -1,6 +1,6 @@
 
 (*
- * Copyright 2021 Scania CV AB
+ * Copyright 2021, 2025 Scania CV AB
  * Copyright 2021 KTH
  *
  * This program is free software; you can redistribute it and/or
@@ -43,23 +43,22 @@ let run_tricera tri_path =
   in
   Sys.command cmd_str
 
-let str_find_opt r s n =
-  try Some(Str.search_forward r s n) with Not_found -> None
-
 (*Assume contract for function foo starts with line: is of form
-/* contracts for foo */
+/* contracts for foo */ or /* contract for foo */
 *)
-let contracts_regex = Str.regexp "/\\* contracts for [0-9a-zA-Z_][0-9a-zA-Z_]* \\*/"
+let contracts_regex = Str.regexp "/\\* contracts? for \\([a-zA-Z_][0-9a-zA-Z_]*\\) \\*/"
 let acsl_start_regex = Str.regexp "/\\*@$?"
 let acsl_end_regex = Str.regexp ".*\\*/$?"
 
-(*Assume contract for function foo starts with line: is of form
-/* contracts for foo */
+(*Looks for function name in a comment on the form: 
+  '/* contract for <functionn-name> */'
 *)
-let contracts_start_to_name s =
-  let s' = Str.replace_first (Str.regexp "/\\* contracts for") "" s in
-  let s' = Str.replace_first (Str.regexp "\\*/") "" s' in
-  String.trim s'
+let find_function_name s =
+  try 
+    let _ = Str.search_forward contracts_regex s 0 in
+    Some(Str.matched_group 1 s)
+  with
+    Not_found -> None
 
 
 (*Returns the contract as a list of lines*)
@@ -77,9 +76,8 @@ let rec contracts_to_hash ic ht =
   match (try_read ic) with
     | Some s ->
       let s = String.trim s in
-      let _ = (match (str_find_opt contracts_regex s 0) with
-          | Some(_) ->
-            let fn_name = contracts_start_to_name s in
+      let _ = (match (find_function_name s) with
+          | Some(fn_name) ->
             let clist = read_a_contract ic in
             Hashtbl.add ht fn_name clist
           | None -> ())

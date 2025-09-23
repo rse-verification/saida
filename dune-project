@@ -5,7 +5,7 @@
 (generate_opam_files true)
 
 (license GPL-2.0-or-later)
-(maintainers "Gustav Ung")
+(maintainers "Ola Wingbrant" "Jesper Amilon")
 (authors "The Saida development team")
 (source (github rse-verification/saida))
 (homepage "https://github.com/rse-verification/saida")
@@ -15,7 +15,7 @@
   (name frama-c-saida)
  (depends
   (ocaml (>= 4.13.1))
-  (frama-c (>= 29)))
+  (frama-c (= 29.0)))
  (synopsis "ACSL contract inference for helper functions")
  (description "This plugin for the Frama-C platform for source code analysis
 of C programs provides inference of ACSL contracts for helper functions."))

@@ -1,5 +1,5 @@
 (*
- * Copyright 2021 Scania CV AB
+ * Copyright 2021, 2025 Scania CV AB
  * Copyright 2021 KTH
  *
  * This program is free software; you can redistribute it and/or
@@ -38,7 +38,7 @@ let entry_regex () = Str.regexp ".*entry.*(.*)$?"
 
 let get_fn_name s =
   (* Scanf.sscanf s "%s %s()%s" (fun _ x _ -> x) *)
-  let m = Str.string_match (Str.regexp {|.* \(.+\)(.*).*|}) s 0 in
+  let m = Str.string_match (Str.regexp {|.* \(.+\)(.*\($\|).*\)|}) s 0 in
   if m = true then
     (
       Str.matched_group 1 s
