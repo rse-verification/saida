@@ -21,9 +21,7 @@
 
 open Saida_vis
 open Tricera2acsl
-open Filepath (*Needed to read the line number*)
 open Options_saida
-
 
 (*This is a dirty fix for replacing ghost assigns, TODO: fix this properly later*)
 let ghost_regex = Str.regexp ".*//@ ghost"
@@ -53,7 +51,7 @@ let get_fn_name s =
 *)
 let line_to_fun_def n fn_list =
     List.find_opt
-      (fun (name, (start_pos, end_pos)) -> n == start_pos.pos_lnum)
+      (fun (name, (start_pos, end_pos)) -> n == start_pos.Filepath.pos_lnum)
       fn_list
 
 (*Checks if line nr n is start of a fun definition*)

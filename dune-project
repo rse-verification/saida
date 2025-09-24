@@ -15,7 +15,7 @@
   (name frama-c-saida)
  (depends
   (ocaml (>= 4.13.1))
-  (frama-c (= 29.0)))
+  (frama-c (= 31.0)))
  (synopsis "ACSL contract inference for helper functions")
  (description "This plugin for the Frama-C platform for source code analysis
 of C programs provides inference of ACSL contracts for helper functions."))

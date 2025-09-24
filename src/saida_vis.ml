@@ -35,25 +35,25 @@ module IntSet = Set.Make(Int)
 (*Function name for initializing variables non-deterministically
   in TriCera. Currently only int or int* or struct/union supported *)
 let rec non_det_func_name typ =
-  match typ with
-    | TInt(_, _) -> "non_det_int"
-    | TPtr(inner_typ, _) -> (non_det_func_name inner_typ) ^ "_ptr"
-    | TComp(cinfo, _) ->  (*union or struct*)
+  match typ.tnode with
+    | TInt(_) -> "non_det_int"
+    | TPtr(inner_typ) -> (non_det_func_name inner_typ) ^ "_ptr"
+    | TComp(cinfo) ->  (*union or struct*)
       let cfull =  (Cil.compFullName cinfo) in
       let clist = Str.split (Str.regexp "[ \t]+") cfull in
       "non_det_" ^ (String.concat "_" clist)
-    | TEnum(einfo, _) -> "non_det_enum_" ^ einfo.eorig_name
-    | TNamed(tinfo, _) -> "non_det_" ^ tinfo.torig_name
+    | TEnum(einfo) -> "non_det_enum_" ^ einfo.eorig_name
+    | TNamed(tinfo) -> "non_det_" ^ tinfo.torig_name
     | _ -> "Non-supported-type-for-non-det_name"
 
 
 let rec non_det_func_decl_help typ =
-  match typ with
-    | TInt(_, _) -> "int"
-    | TPtr(inner_typ, _) -> (non_det_func_decl_help inner_typ) ^ "*"
-    | TEnum(einfo, _) -> "enum " ^ einfo.eorig_name
-    | TComp(cinfo, _) -> (Cil.compFullName cinfo)
-    | TNamed(tinfo, _) -> tinfo.torig_name
+  match typ.tnode with
+    | TInt(_) -> "int"
+    | TPtr(inner_typ) -> (non_det_func_decl_help inner_typ) ^ "*"
+    | TEnum(einfo) -> "enum " ^ einfo.eorig_name
+    | TComp(cinfo) -> (Cil.compFullName cinfo)
+    | TNamed(tinfo) -> tinfo.torig_name
     | _ -> "Non-supported-type-for-non-det"
 
 
@@ -520,8 +520,8 @@ let make_harness_func f_svar behavs =
   in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
   let h_block = make_harness_block f_svar.vname old_vars all_log_vars in
-  let f_ret_type = match f_svar.vtype with
-    | TFun(r, _, _, _) -> r
+  let f_ret_type = match f_svar.vtype.tnode with
+    | TFun(r, _, _) -> r
     | _ -> f_svar.vtype (*shouldnt happen*)
   in
   {
@@ -586,11 +586,11 @@ let rec repeat_str str n =
   else str ^ (repeat_str str (n-1))
 
 let rec get_type_decl_string typ =
-  match typ with
-    | TInt(_, _) -> "int"
-    | TComp(cinfo, _) -> Cil.compFullName cinfo
-    | TPtr(inner_type, _) -> (get_type_decl_string inner_type) ^ " *"
-    | TNamed(tinfo, _) -> tinfo.torig_name
+  match typ.tnode with
+    | TInt(_) -> "int"
+    | TComp(cinfo) -> Cil.compFullName cinfo
+    | TPtr(inner_type) -> (get_type_decl_string inner_type) ^ " *"
+    | TNamed(tinfo) -> tinfo.torig_name
     | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
 
 let get_var_decl_string vi =
@@ -599,13 +599,13 @@ let get_var_decl_string vi =
 
 (*special case where i first levels of derefs are not counted*)
 let rec get_type_decl_string_2 typ i =
-  match typ with
-    | TInt(_, _) -> "int"
-    | TComp(cinfo, _) -> Cil.compFullName cinfo
-    | TPtr(inner_type, _) ->
+  match typ.tnode with
+    | TInt(_) -> "int"
+    | TComp(cinfo) -> Cil.compFullName cinfo
+    | TPtr(inner_type) ->
       let s = if i > 0 then "" else " *" in
       (get_type_decl_string_2 inner_type (i-1)) ^ s
-    | TNamed(tinfo, _) -> tinfo.torig_name
+    | TNamed(tinfo) -> tinfo.torig_name
     | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
 
 let get_var_decl_string_2 vi i =
@@ -615,7 +615,7 @@ let get_var_decl_string_2 vi i =
 let get_logic_var_decl_string lv =
   let type_string =
     match lv.lv_type with
-      | Ctype(typ) -> get_type_decl_string typ
+      | Ctype(inner_type) -> get_type_decl_string inner_type
       | Linteger -> "int"
       | _ -> "Unspported_type_of_logic_var"
   in
@@ -692,6 +692,8 @@ let get_ensures_with_ghost_right_of_impl ensures =
 
 let locic_const_to_string lc =
   match lc with
+    | Boolean(false) -> Printf.sprintf "%d" 0 (* TriCera does not support "false" yet. *)
+    | Boolean(true) -> Printf.sprintf "%d" 1 (* TriCera does not support "true" yet. *)
     | Integer(i, _) -> (Integer.to_string i)
     | LStr(str) -> str
     | LWStr(_) -> "wide-char-const not supported"
@@ -749,7 +751,7 @@ class acsl2tricera out = object (self)
   method get_curr_func_svar =
     match curr_func with
       | Some f -> f.svar
-      | None -> Cil.makeGlobalVar "FUNC_MISSING" Cil.voidType
+      | None -> Cil.makeGlobalVar "FUNC_MISSING" Cil_const.voidType
 
   method result_string = self#get_curr_func_name ^ "_result";
 
@@ -790,12 +792,16 @@ class acsl2tricera out = object (self)
     self#print_string (Printf.sprintf "extern int %s();\n\n" non_det_int_name);
     let non_det_int_ptr_name = non_det_func_name Cil.intPtrType in
     self#print_string ("extern int* %s()" ^ non_det_int_ptr_name ^ ";\n\n"); *)
-    let type_list = List.map (fun vi -> (non_det_func_name vi.vtype, vi.vtype)) gv_list in
+
+    List.iter (fun vi -> self#print_line (non_det_func_decl vi.vtype)) gv_list;
+(*
+    let type_list = List.map (fun vi -> ( vi.vtype, vi.vtype)) gv_list in
     let type_map = StringMap.of_seq (List.to_seq type_list) in
     let _ = StringMap.iter
       (fun _ typp -> self#print_line (non_det_func_decl typp))
       type_map
     in
+*)
     self#print_newline;
 
   method add_let_var_def b =
@@ -1011,8 +1017,8 @@ class acsl2tricera out = object (self)
           in
           (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
           (*Quick fix main2 for working in tricera*)
-          let s = match hf.return_type with
-            | TVoid _ -> ""
+          let s = match hf.return_type.tnode with
+            | TVoid -> ""
             | _ -> (get_type_decl_string hf.return_type) ^ " " ^ self#result_string ^ " = "
           in
           let fname = curr_func.svar.vname in
