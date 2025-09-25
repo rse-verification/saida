@@ -22,7 +22,8 @@ jobs:
           - framac/frama-c:31.0
 
     runs-on: ${{ matrix.os }}
-    image: ${{ matrix.frama-c-image }}
+    container:
+      image: ${{ matrix.frama-c-image }}
 
     steps:
       - name: Checkout tree
