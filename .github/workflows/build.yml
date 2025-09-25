@@ -31,7 +31,8 @@ jobs:
         uses: actions/checkout@v4
         
       - run: |
-          opam init --shell-setup
+          chown -R opam:opam .
+          su - opam
           eval $(opam env)
           opam install . --deps-only --with-test
           opam exec -- dune build
