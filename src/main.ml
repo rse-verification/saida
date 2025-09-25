@@ -149,16 +149,16 @@ let run_wp_plugin filename =
 
 
 
-let merge_source_w_inferred source_file fn_list =
+let merge_source_w_inferred source_file fn_list out_file =
   let contracts_hash = create_contracts_hash () in
   let source_ic = open_in source_file in
   let n = in_channel_length source_ic in
   let buff = Buffer.create n in
   let () = add_inferred_to_source source_ic buff contracts_hash 1 fn_list in
   let () = close_in source_ic in
-  let out_file = open_out inferred_source_merged_fname in
-  let _ = Buffer.output_buffer out_file buff in
-  close_out out_file
+  let out_chan = open_out out_file in
+  let _ = Buffer.output_buffer out_chan buff in
+  close_out out_chan
 
 
 let run () =
@@ -170,6 +170,7 @@ let run () =
     let a2t = new acsl2tricera fmt in
     let fn_list = a2t#translate in
     let _ = Format.pp_print_flush fmt () in
+    let output_name = Output_file.get () in
     let source_files = Kernel.Files.get () in
     if List.length source_files == 0 then
       Self.result "Error, no source file found";
@@ -180,9 +181,10 @@ let run () =
         let source_file = Filepath.Normalized.to_pretty_string (List.nth source_files 0) in
         source_w_harness source_file harness_buff fn_list;
         ignore (run_tricera (Tricera_path.get ()));
-        merge_source_w_inferred source_file fn_list;
+
+        merge_source_w_inferred source_file fn_list output_name;
         if Run_wp.get () then
-          let fname = inferred_source_merged_fname
+          let fname = output_name
           in run_wp_plugin fname;
       end
     (* Buffer.output_buffer chan harness_buff; *)
