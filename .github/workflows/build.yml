@@ -29,8 +29,10 @@ jobs:
     steps:
       - name: Checkout tree
         uses: actions/checkout@v4
-
+        
       - run: |
+          opam init --shell-setup
+          eval $(opam env)
           opam install . --deps-only --with-test
           opam exec -- dune build
           opam exec -- dune runtest
