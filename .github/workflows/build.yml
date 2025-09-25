@@ -24,10 +24,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.frama-c-image }}
+      options: --user root
 
     steps:
       - name: Checkout tree
         uses: actions/checkout@v4
+
       - run: |
           opam install . --deps-only --with-test
           opam exec -- dune build
