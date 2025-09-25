@@ -24,7 +24,6 @@ open Options_saida
 
 let harness_source_merged_fname = "tmp_harness_source_merged.c"
 let tricera_output_name = "tmp_tricera_result.txt"
-let inferred_source_merged_fname = "tmp_inferred_source_merged.c"
 
 let try_read ic =
     try Some (input_line ic) with End_of_file -> None

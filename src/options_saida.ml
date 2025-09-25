@@ -34,9 +34,9 @@ module Self = Plugin.Register
 module Output_file = Self.String
   (struct
     let option_name = "-saida-out"
-    let default = "saida_out.c"
+    let default = "saida.out"
     let arg_name = "output_file"
-    let help = "File to save harness function for the contract"
+    let help = "Name of file to store the source code with inferred contracts in."
   end)
 
 
@@ -45,7 +45,7 @@ module Tricera_path = Self.String
   (struct
     let option_name = "-saida-tricera-path"
     let default = "tri"
-    let arg_name = "output_file"
+    let arg_name = "tricera_path"
     let help = "Sets the path to the TriCera executable"
   end)
 
