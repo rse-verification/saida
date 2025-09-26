@@ -31,7 +31,7 @@ module Self = Plugin.Register
 
 (*option for setting the output-file*)
 (*TODO: use builtin -ocode instead*)
-module Output_file = Self.String
+module OutputFile = Self.String
   (struct
     let option_name = "-saida-out"
     let default = "saida.out"
@@ -41,7 +41,7 @@ module Output_file = Self.String
 
 
 (* option to set the path to the "tri" executable *)
-module Tricera_path = Self.String
+module TriceraPath = Self.String
   (struct
     let option_name = "-saida-tricera-path"
     let default = "tri"

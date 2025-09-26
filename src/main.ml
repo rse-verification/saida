@@ -183,7 +183,7 @@ let run () =
     let a2t = new acsl2tricera fmt in
     let fn_list = a2t#translate in
     let _ = Format.pp_print_flush fmt () in
-    let output_fname = Output_file.get () in
+    let output_fname = OutputFile.get () in
     match Kernel.Files.get () with
     | [] -> Self.result "Error, no source file found"
     | head::tail ->
@@ -195,7 +195,7 @@ let run () =
         let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
         source_w_harness source_fname harness_buff fn_list harness_fname;
         ignore (run_tricera 
-          (Tricera_path.get ()) (TriceraOptions.get ()) harness_fname result_fname);
+          (TriceraPath.get ()) (TriceraOptions.get ()) harness_fname result_fname);
         merge_source_w_inferred source_fname fn_list result_fname output_fname;
         if Run_wp.get () then
           let fname = output_fname
