@@ -1,3 +1,8 @@
+/* run.config
+   LOG: @PTEST_NAME@.out.c
+   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
+*/
+
 int g1, g2;
 
 int sum(int n) {

@@ -19,26 +19,12 @@
  *
  *  SPDX-License-Identifier: GPL-2.0+
  *)
-
-open Options_saida
-
-let harness_source_merged_fname = "tmp_harness_source_merged.c"
-let tricera_output_name = "tmp_tricera_result.txt"
-
 let try_read ic =
     try Some (input_line ic) with End_of_file -> None
 
-(* let tricera_exec_file_path = "tricera/tri" *)
-
-let run_tricera tri_path =
-  let cmd_str =
-    if NoTriPP.get () then
-        tri_path ^ " -noPP "
-    else
-        tri_path ^ " "
-    in
-  let cmd_str = cmd_str ^ harness_source_merged_fname ^ " -log"
-                ^ " > " ^ tricera_output_name
+let run_tricera tri_path tri_opts harness_fname output_fname =
+  let cmd_str = Format.asprintf "%s %s %s > %s" 
+    tri_path tri_opts harness_fname output_fname
   in
   Sys.command cmd_str
 
@@ -90,9 +76,9 @@ let rec contracts_to_hash ic ht =
  *)
     | None -> ()
 
-let create_contracts_hash () =
+let create_contracts_hash tricera_result_fname =
   let ht = Hashtbl.create 10 in
-  let ic = open_in tricera_output_name in
-  let _ = contracts_to_hash ic ht in
-  let _ = close_in ic in
+  let ic = open_in tricera_result_fname in
+  contracts_to_hash ic ht;
+  close_in ic;
   ht

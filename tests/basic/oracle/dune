@@ -1,0 +1,7 @@
+(rule (target "simple.err.oracle") (mode fallback) (action (write-file "simple.err.oracle" "")))
+(rule (target "simple.res.oracle") (mode fallback) (action (write-file "simple.res.oracle" "")))
+(rule (target "simple.out.c") (mode fallback) (action (write-file "simple.out.c" "")))
+(rule (target "sum.err.oracle") (mode fallback) (action (write-file "sum.err.oracle" "")))
+(rule (target "sum.res.oracle") (mode fallback) (action (write-file "sum.res.oracle" "")))
+(rule (target "sum.out.c") (mode fallback) (action (write-file "sum.out.c" "")))
+
