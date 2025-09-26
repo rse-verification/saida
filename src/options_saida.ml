@@ -40,7 +40,7 @@ module Output_file = Self.String
   end)
 
 
-
+(* option to set the path to the "tri" executable *)
 module Tricera_path = Self.String
   (struct
     let option_name = "-saida-tricera-path"
@@ -49,13 +49,24 @@ module Tricera_path = Self.String
     let help = "Sets the path to the TriCera executable"
   end)
 
-(*option for enabling the plugin when running frama-c*)
-module NoTriPP = Self.False
+(* option to pass custom command line arguments to TriCera *)
+module TriceraOptions = Self.String
   (struct
-    let option_name = "-saida-noTriPP"
-    let help = "Turn off the TriCera preprocessor"
-  end)
+    let option_name = "-saida-tricera-opts"
+    let default = "-log"
+    let arg_name = "tricera_opts"
+    let help = "Options to pass to TriCera (default: -log)."
+  end)  
 
+(*option for keeping temporary generated files to/from TriCera*)
+module KeepTempFiles = Self.False
+  (struct
+    let option_name = "-saida-keep-tmp"
+    let help = 
+      "Keep temporary files. They will be placed in the same \
+       directory as the source file. The name follow the template \
+       'saida_tmp_<random_number>_<source_file_name>'"
+  end)
 
 (*option for enabling the plugin when running frama-c*)
 module Enabled = Self.False

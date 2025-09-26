@@ -1,5 +1,6 @@
 /* run.config
-   OPT: -saida
+   LOG: @PTEST_NAME@.out.c
+   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
 
 int g;
@@ -7,7 +8,6 @@ int g;
 int add_one(int x) {
   return x+1;
 }
-
 
 /*@
   requires g >= 0;
