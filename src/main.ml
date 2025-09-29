@@ -21,9 +21,7 @@
 
 open Saida_vis
 open Tricera2acsl
-open Filepath (*Needed to read the line number*)
 open Options_saida
-
 
 (*This is a dirty fix for replacing ghost assigns, TODO: fix this properly later*)
 let ghost_regex = Str.regexp ".*//@ ghost"
@@ -53,7 +51,7 @@ let get_fn_name s =
 *)
 let line_to_fun_def n fn_list =
     List.find_opt
-      (fun (name, (start_pos, end_pos)) -> n == start_pos.pos_lnum)
+      (fun (name, (start_pos, end_pos)) -> n == start_pos.Filepath.pos_lnum)
       fn_list
 
 (*Checks if line nr n is start of a fun definition*)
@@ -190,7 +188,7 @@ let run () =
         if List.length tail > 0 then
           Self.feedback "Warning, more then 1 source file found, using only first";
 
-        let source_fname = Filepath.Normalized.to_pretty_string head in
+        let source_fname = Filepath.to_string head in
         let harness_fname = get_harness_fname (KeepTempFiles.get ()) source_fname in
         let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
         source_w_harness source_fname harness_buff fn_list harness_fname;
