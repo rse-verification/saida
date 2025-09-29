@@ -792,16 +792,12 @@ class acsl2tricera out = object (self)
     self#print_string (Printf.sprintf "extern int %s();\n\n" non_det_int_name);
     let non_det_int_ptr_name = non_det_func_name Cil.intPtrType in
     self#print_string ("extern int* %s()" ^ non_det_int_ptr_name ^ ";\n\n"); *)
-
-    List.iter (fun vi -> self#print_line (non_det_func_decl vi.vtype)) gv_list;
-(*
-    let type_list = List.map (fun vi -> ( vi.vtype, vi.vtype)) gv_list in
+    let type_list = List.map (fun vi -> (non_det_func_name vi.vtype , vi.vtype)) gv_list in
     let type_map = StringMap.of_seq (List.to_seq type_list) in
     let _ = StringMap.iter
       (fun _ typp -> self#print_line (non_det_func_decl typp))
       type_map
     in
-*)
     self#print_newline;
 
   method add_let_var_def b =

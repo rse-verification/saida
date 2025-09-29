@@ -188,7 +188,7 @@ let run () =
         if List.length tail > 0 then
           Self.feedback "Warning, more then 1 source file found, using only first";
 
-        let source_fname = Filepath.Normalized.to_pretty_string head in
+        let source_fname = Filepath.to_string head in
         let harness_fname = get_harness_fname (KeepTempFiles.get ()) source_fname in
         let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
         source_w_harness source_fname harness_buff fn_list harness_fname;
