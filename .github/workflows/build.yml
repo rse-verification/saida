@@ -32,8 +32,8 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - run: |
-          opam --cli=2.1.5 install . --deps-only --with-test
+          opam --cli=2.1 install . --deps-only --with-test
           frama-c-ptests
-          opam --cli=2.1.5 exec -- dune build @install
-          opam --cli=2.1.5 exec -- dune build @ptests
-          opam --cli=2.1.5 exec -- dune runtest
+          opam --cli=2.1 exec -- dune build @install
+          opam --cli=2.1 exec -- dune build @ptests
+          opam --cli=2.1 exec -- dune runtest
