@@ -32,6 +32,10 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - run: |
-          opam install . --deps-only --with-test
-          opam exec -- dune build
-          opam exec -- dune runtest
+          opam --cli=2.1 install . --deps-only --with-test
+          opam --cli=2.1 exec -- frama-c-ptests
+          opam --cli=2.1 exec -- dune build @install
+          # Currently we can't run ptests because they depend on tricera,
+          # which is not installed in the CI.
+          # opam --cli=2.1 exec -- dune build @ptests
+          opam --cli=2.1 exec -- dune runtest
