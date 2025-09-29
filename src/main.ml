@@ -104,13 +104,13 @@ let rec add_contract_annots ic buff in_acsl line fn_list =
 
 (*Takes buffer for the harness function and the original file name and merges*)
 (*File reading from Rosetta code ("read entire file")*)
-let source_w_harness source_fname hbuff fn_list =
+let source_w_harness source_fname hbuff fn_list dest_fname =
   let source_f = open_in source_fname in
     let n = in_channel_length source_f in
     let source_buff = Buffer.create n in
     let _ = add_contract_annots source_f source_buff false 1 fn_list in
     let _ = close_in source_f in
-  let merge_file = open_out harness_source_merged_fname in
+  let merge_file = open_out dest_fname in
     let _ = Buffer.output_buffer merge_file source_buff in
     let _ = Buffer.output_buffer merge_file hbuff in
     close_out merge_file
@@ -139,9 +139,6 @@ let rec add_inferred_to_source ic buff ht line fn_list =
 
 
 
-
-
-
 let run_wp_plugin filename =
   Self.feedback "wp plugin started for file '%s'" filename;
   let libentry = if Kernel.LibEntry.get () then "-lib-entry" else "" in
@@ -149,16 +146,33 @@ let run_wp_plugin filename =
 
 
 
-let merge_source_w_inferred source_file fn_list out_file =
-  let contracts_hash = create_contracts_hash () in
+let merge_source_w_inferred source_file fn_list result_fname out_fname =
+  let contracts_hash = create_contracts_hash result_fname in
   let source_ic = open_in source_file in
   let n = in_channel_length source_ic in
   let buff = Buffer.create n in
   let () = add_inferred_to_source source_ic buff contracts_hash 1 fn_list in
   let () = close_in source_ic in
-  let out_chan = open_out out_file in
+  let out_chan = open_out out_fname in
   let _ = Buffer.output_buffer out_chan buff in
   close_out out_chan
+
+
+let get_tmp_fname keep_file prefix orig_fname =
+  let fname = Filename.basename orig_fname in
+  let tmpdir = if keep_file
+    then Filename.dirname orig_fname
+    else Filename.get_temp_dir_name ()
+  in
+  Filename.temp_file ~temp_dir:tmpdir prefix ("_" ^ fname)
+
+
+let get_harness_fname keep_file orig_fname =
+  get_tmp_fname keep_file "saida_harness_" orig_fname
+
+
+let get_result_fname keep_file orig_fname =
+  get_tmp_fname keep_file "saida_result_" orig_fname
 
 
 let run () =
@@ -166,29 +180,26 @@ let run () =
   if Enabled.get () then
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
-    (* let fmt = Format.formatter_of_out_channel chan in *)
     let a2t = new acsl2tricera fmt in
     let fn_list = a2t#translate in
     let _ = Format.pp_print_flush fmt () in
-    let output_name = Output_file.get () in
-    let source_files = Kernel.Files.get () in
-    if List.length source_files == 0 then
-      Self.result "Error, no source file found";
-    if List.length source_files > 1 then
-      Self.feedback "More then 1 source file found, using only first";
-    if List.length source_files >= 1 then
-      begin
-        let source_file = Filepath.Normalized.to_pretty_string (List.nth source_files 0) in
-        source_w_harness source_file harness_buff fn_list;
-        ignore (run_tricera (Tricera_path.get ()));
+    let output_fname = OutputFile.get () in
+    match Kernel.Files.get () with
+    | [] -> Self.result "Error, no source file found"
+    | head::tail ->
+        if List.length tail > 0 then
+          Self.feedback "Warning, more then 1 source file found, using only first";
 
-        merge_source_w_inferred source_file fn_list output_name;
+        let source_fname = Filepath.Normalized.to_pretty_string head in
+        let harness_fname = get_harness_fname (KeepTempFiles.get ()) source_fname in
+        let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
+        source_w_harness source_fname harness_buff fn_list harness_fname;
+        ignore (run_tricera 
+          (TriceraPath.get ()) (TriceraOptions.get ()) harness_fname result_fname);
+        merge_source_w_inferred source_fname fn_list result_fname output_fname;
         if Run_wp.get () then
-          let fname = output_name
+          let fname = output_fname
           in run_wp_plugin fname;
-      end
-    (* Buffer.output_buffer chan harness_buff; *)
-    (* Format.fprintf fmt "%!"; *)
   with Sys_error _ as exc ->
     let msg = Printexc.to_string exc in
       Printf.eprintf "There was an error: %s\n" msg

@@ -5,3 +5,4 @@ _build
 .#*
 .dune.lock
 .dune-stamp
+tests/**/result/*
