@@ -768,6 +768,7 @@ class acsl2tricera out = object (self)
   method print_right_parenth = Format.fprintf out ")"
   method print_newline = Format.fprintf out "\n"
 
+(* FIX ME: REMOVE THIS, not used
   method get_curr_fun_formals =
     match curr_func with
       | None -> ""
@@ -777,7 +778,7 @@ class acsl2tricera out = object (self)
             (fun vi -> vi.vorig_name)
             f.sformals
         in Printf.sprintf "(%s)" (String.concat "," formals_name_list)
-
+*)
 
   method enter_old_label =
     let prev_label = inside_old_label in
@@ -800,11 +801,12 @@ class acsl2tricera out = object (self)
     in
     self#print_newline;
 
+
   method add_let_var_def b =
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
   method! vfile f =
-    let gv_list =
+    let global_vars =
       List.filter_map
         (
           fun g ->
@@ -815,10 +817,10 @@ class acsl2tricera out = object (self)
         f.globals
     in
     (*print non-det-ints (only if -lib-entry set) *)
-    let _ = if Kernel.LibEntry.get () then self#print_non_det_funcs gv_list else () in
+    let _ = if Kernel.LibEntry.get () then self#print_non_det_funcs global_vars else () in
     (*Set global vars*)
-    global_c_vars <- List.filter (fun vi -> not vi.vghost) gv_list;
-    global_ghost_vars <- List.filter (fun vi -> vi.vghost) gv_list;
+    global_c_vars <- List.filter (fun vi -> not vi.vghost) global_vars;
+    global_ghost_vars <- List.filter (fun vi -> vi.vghost) global_vars;
     fn_list <- List.filter_map
         (fun g ->
           match g with
@@ -844,6 +846,8 @@ class acsl2tricera out = object (self)
   method! vspec s =
     let _ = if (List.length s.spec_behavior) > 0 then
       begin
+        (* FIX ME: Currently prints a "main" function for each function 
+             in the source that has ACSL annotation. *)
         let har_func = make_harness_func self#get_curr_func_svar s.spec_behavior in
         self#do_fun_spec har_func;
       end
@@ -852,7 +856,7 @@ class acsl2tricera out = object (self)
 
   method print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
-
+(* FIX ME: Rework this, not needed with -forceNondetInit in tricera *)
   method print_global_var_non_det_assigns varinfo_list  =
     if (List.length varinfo_list) > 0 then
       self#print_line "//Non-det assignment of global variables";
@@ -863,6 +867,7 @@ class acsl2tricera out = object (self)
           self#print_line (Printf.sprintf "%s = %s();" vi.vname varTypeFnName);
       )
       varinfo_list;
+
 
   method print_global_ghost_vars_decl =
     if (List.length global_ghost_vars) > 0 then
@@ -881,6 +886,7 @@ class acsl2tricera out = object (self)
     List.iter
       (fun ins -> self#print_indent; Format.fprintf out "%a\n" Printer.pp_instr ins)
       hf.block.old_var_inits; *)
+(* FIX ME: Rework this, not needed with -forceNondetInit in tricera *)
   method print_old_var_inits hf =
     let () = if (List.length hf.block.old_var_inits) > 0 then
       self#print_line "//Initialization of logical old-variables";
@@ -968,6 +974,7 @@ class acsl2tricera out = object (self)
     self#print_string "{\n";
     self#incr_indent;
 
+(* FIX ME: Rework this, not needed with -forceNondetInit in tricera *)
     (*Print the non-det assignments of all global vars in the file*)
     (*Prints _only_ if the lib-entry option is enabled*)
     let _ = if Kernel.LibEntry.get () then
@@ -991,6 +998,7 @@ class acsl2tricera out = object (self)
     self#print_newline;
 
     (*Print the old_var initializations (all c-vars occuring in the post-cond)*)
+(* FIX ME: Rework, not needed with the -forceNondetInit in TriCera *) 
     self#print_old_var_inits hf;
     self#print_newline;
 

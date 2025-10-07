@@ -6,16 +6,16 @@
 int g;
 
 /*@
-  requires g == x && x >= 0;
-  ensures \old(x) - \result == -1 && g - \result == -1 && \old(g) - \result == -1 && \result >= 1;
+  requires g == x && 101 >= x && x >= 0;
+  ensures \old(x) - \result == -1 && g - \result == -1 && \old(g) - \result == -1 && 102 >= \result && \result >= 1;
 */
 int add_one(int x) {
   return x+1;
 }
 
 /*@
-  requires g >= 0;
-  ensures g >= 2;
+  requires 100 >= g >= 0;
+  ensures g >= \old(g)+2;
 */
 void main() {
   g = add_one(g);
