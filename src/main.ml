@@ -91,6 +91,8 @@ let rec add_contract_annots ic buff in_acsl line fn_list =
                       (s,false))
                 | None ->
                     if (Str.string_match ghost_regex s 0) then
+                      (* Obvioulsy this will only work for single line comments. 
+                         If e.g. ghost variable declarations are multi-line, this will fail. *)
                       ((Str.replace_first (Str.regexp "//@ ghost") "" s) ^ " //from ghost code\n", false)
                     else (s^"\n", false))
       in
@@ -103,15 +105,15 @@ let rec add_contract_annots ic buff in_acsl line fn_list =
 (*Takes buffer for the harness function and the original file name and merges*)
 (*File reading from Rosetta code ("read entire file")*)
 let source_w_harness source_fname hbuff fn_list dest_fname =
-  let source_f = open_in source_fname in
-    let n = in_channel_length source_f in
+  let source_chan = open_in source_fname in
+    let n = in_channel_length source_chan in
     let source_buff = Buffer.create n in
-    let _ = add_contract_annots source_f source_buff false 1 fn_list in
-    let _ = close_in source_f in
-  let merge_file = open_out dest_fname in
-    let _ = Buffer.output_buffer merge_file source_buff in
-    let _ = Buffer.output_buffer merge_file hbuff in
-    close_out merge_file
+    let _ = add_contract_annots source_chan source_buff false 1 fn_list in
+    let _ = close_in source_chan in
+  let dest_chan = open_out dest_fname in
+    let _ = Buffer.output_buffer dest_chan source_buff in
+    let _ = Buffer.output_buffer dest_chan hbuff in
+    close_out dest_chan
 
 
 let rec add_inferred_to_source ic buff ht line fn_list =
@@ -193,7 +195,10 @@ let run () =
         let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
         source_w_harness source_fname harness_buff fn_list harness_fname;
         ignore (run_tricera 
-          (TriceraPath.get ()) (TriceraOptions.get ()) harness_fname result_fname);
+          (TriceraPath.get ())
+          false (* (Kernel.LibEntry.get ()) *)
+          (TriceraOptions.get ())
+          harness_fname result_fname);
         merge_source_w_inferred source_fname fn_list result_fname output_fname;
         if Run_wp.get () then
           let fname = output_fname

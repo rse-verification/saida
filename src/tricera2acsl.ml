@@ -22,9 +22,10 @@
 let try_read ic =
     try Some (input_line ic) with End_of_file -> None
 
-let run_tricera tri_path tri_opts harness_fname output_fname =
-  let cmd_str = Format.asprintf "%s %s %s > %s" 
-    tri_path tri_opts harness_fname output_fname
+let run_tricera tri_path force_nondet_init tri_opts harness_fname output_fname =
+  let forced_init = if force_nondet_init then "-forceNondetInit" else "" in
+  let cmd_str = Format.asprintf "%s %s %s %s > %s" 
+    tri_path forced_init tri_opts harness_fname output_fname
   in
   Sys.command cmd_str
 
