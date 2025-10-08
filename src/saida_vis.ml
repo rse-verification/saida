@@ -119,13 +119,6 @@ let rec struct_fields_to_list toff =
       in
         s::(array_offsets_to_list toff') *)
 
-(*FIX ME: REMOVE, not used
-let old_name_struct_field lv toff =
-  let vname = logic_var_name lv in
-  let offsetslist = struct_fields_to_list toff in
-  "old_" ^ vname ^ "__" ^ (String.concat "__" offsetslist)
-*)
-
 let rec get_struct_repr lv toff =
   let vname = logic_var_name lv in
   let offsetslist = struct_fields_to_list toff in
@@ -773,18 +766,6 @@ class acsl2tricera out = object (self)
     f ();
     self#print_string ")"
 
-(* FIX ME: REMOVE THIS, not used
-  method get_curr_fun_formals =
-    match curr_func with
-      | None -> ""
-      | Some f ->
-        let formals_name_list =
-          List.map
-            (fun vi -> vi.vorig_name)
-            f.sformals
-        in Printf.sprintf "(%s)" (String.concat "," formals_name_list)
-*)
-
   method enter_old_label =
     let prev_label = inside_old_label in
       inside_old_label <- true;
@@ -861,19 +842,8 @@ class acsl2tricera out = object (self)
 
   method print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
-(* FIX ME: Rework this, not needed with -forceNondetInit in tricera *)
-  method print_global_var_non_det_assigns varinfo_list  =
-    if (List.length varinfo_list) > 0 then
-      self#print_line "//Non-det assignment of global variables";
-    List.iter
-      (
-        fun vi ->
-          let varTypeFnName = non_det_func_name vi.vtype in
-          self#print_line (Printf.sprintf "%s = %s();" vi.vname varTypeFnName);
-      )
-      varinfo_list;
 
-
+  (* Currently not used, global ghost variables are introduced in main.ml *)
   method print_global_ghost_vars_decl =
     if (List.length global_ghost_vars) > 0 then
       self#print_line "//Declaring all global ghost vars";
@@ -884,37 +854,6 @@ class acsl2tricera out = object (self)
         self#print_newline;
       )
       global_ghost_vars;
-
-  (* method print_old_var_inits hf =
-    if (List.length hf.block.old_var_inits) > 0 then
-      self#print_line "//Initialization of logical old-variables";
-    List.iter
-      (fun ins -> self#print_indent; Format.fprintf out "%a\n" Printer.pp_instr ins)
-      hf.block.old_var_inits; *)
-(* FIX ME: Rework this, not needed with -forceNondetInit in tricera *)
-  method print_old_var_inits hf =
-    let () = if (List.length hf.block.old_var_inits) > 0 then
-      self#print_line "//Initialization of logical old-variables";
-    in
-    let get_old_vi vi' i =
-      let deref_str = repeat_str "ptr_" i in
-      Cil.copyVarinfo vi' ("old_" ^ deref_str ^ vi'.vorig_name) in
-    List.iter
-      (fun (vi, i) ->
-        let decl_str = get_var_decl_string_2 (get_old_vi vi i) i in
-        self#print_line decl_str;
-      )
-      hf.block.old_var_inits;
-    List.iter
-      (
-        fun (vi, i) ->
-          let orig_deref_str = String.make i '*' in
-          let old_var = (get_old_vi vi i) in
-          self#print_line (Printf.sprintf "assume(%s == %s);"
-            (old_var.vname) (orig_deref_str^vi.vname))
-      )
-      hf.block.old_var_inits;
-
 
   method print_require_assumes hf =
     if (List.length hf.assumes) > 0 then
@@ -979,15 +918,6 @@ class acsl2tricera out = object (self)
     self#print_string "{\n";
     self#incr_indent;
 
-(* FIX ME: Rework this, not needed with -forceNondetInit in tricera *)
-    (*Print the non-det assignments of all global vars in the file*)
-    (*Prints _only_ if the lib-entry option is enabled*)
-    let _ = if Kernel.LibEntry.get () then
-      let _ = self#print_global_var_non_det_assigns global_c_vars in
-      let _ = self#print_global_var_non_det_assigns global_ghost_vars in
-      self#print_newline;
-    in
-
     (*Print the initialization of parameters (if any)*)
     self#print_params_init;
     self#print_newline;
@@ -1000,11 +930,6 @@ class acsl2tricera out = object (self)
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
     self#print_log_var_decls hf;
-    self#print_newline;
-
-    (*Print the old_var initializations (all c-vars occuring in the post-cond)*)
-(* FIX ME: Rework, not needed with the -forceNondetInit in TriCera *) 
-    self#print_old_var_inits hf;
     self#print_newline;
 
     (*Print the assumes (from pre-cond)*)
