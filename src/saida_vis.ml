@@ -119,10 +119,12 @@ let rec struct_fields_to_list toff =
       in
         s::(array_offsets_to_list toff') *)
 
+(*FIX ME: REMOVE, not used
 let old_name_struct_field lv toff =
   let vname = logic_var_name lv in
   let offsetslist = struct_fields_to_list toff in
   "old_" ^ vname ^ "__" ^ (String.concat "__" offsetslist)
+*)
 
 let rec get_struct_repr lv toff =
   let vname = logic_var_name lv in
@@ -579,8 +581,6 @@ let unop_to_string uop =
     | BNot -> "~"
     | LNot -> "!"
 
-let get_vi_use_string vi = vi.vorig_name
-
 let rec repeat_str str n =
   if n = 0 then ""
   else str ^ (repeat_str str (n-1))
@@ -767,6 +767,11 @@ class acsl2tricera out = object (self)
   method print_left_parenth = Format.fprintf out "("
   method print_right_parenth = Format.fprintf out ")"
   method print_newline = Format.fprintf out "\n"
+
+  method print_wrapped_in_old (t : logic_type ) (f : unit -> unit) =
+    self#print_string (Format.asprintf "$at(Old, (%a)" Printer.pp_typ (Logic_utils.logicCType t));
+    f ();
+    self#print_string ")"
 
 (* FIX ME: REMOVE THIS, not used
   method get_curr_fun_formals =
@@ -1096,9 +1101,11 @@ class acsl2tricera out = object (self)
       | Pat(p, ll) ->
           let _ = if is_old_or_pre_logic_label ll then
             begin
-              let prev_label = self#enter_old_label in
-              ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-              self#restore_old_label prev_label;
+              self#print_wrapped_in_old (Cil_types.Ctype {tnode = Cil_types.TInt IChar; tattr = []})
+                (fun () -> 
+                  let prev_label = self#enter_old_label in
+                  ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
+                  self#restore_old_label prev_label;)           
             end
           else
             self#print_string "unsupported predicate label";
@@ -1116,6 +1123,9 @@ class acsl2tricera out = object (self)
       | Plet(b, p) ->
         self#add_let_var_def b;
         ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
+        Cil.SkipChildren
+      | Pvalid(ll, t) ->
+        Printer.pp_predicate_node out pn;
         Cil.SkipChildren
       | _ -> self#print_string "unsupported predicate received..";
         Cil.SkipChildren
@@ -1157,9 +1167,12 @@ class acsl2tricera out = object (self)
         | Tat(t, ll) ->
           if is_old_or_pre_logic_label ll then
             begin
-              let prev_label = self#enter_old_label in
-                ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-                self#restore_old_label prev_label;
+              self#print_wrapped_in_old
+                t.term_type
+                (fun () -> 
+                  let prev_label = self#enter_old_label in
+                  ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+                  self#restore_old_label prev_label;);
             end
           else
             begin
@@ -1209,14 +1222,8 @@ Cases:
         in
         Cil.SkipChildren
       | TMem(t) ->
-        let () = if inside_old_label then
-          let () = self#incr_deref_lvl in
-          let _ =  Cil.visitCilTerm (self :> Cil.cilVisitor) t in
-          self#decr_deref_lvl;
-        else
-          let () = self#print_string "*" in
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        in
+        self#print_string "*";
+        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
         Cil.SkipChildren
       | TVar(lv) ->
           (* first, check if it is a let-variable *)
@@ -1236,13 +1243,7 @@ Cases:
                   ignore ( Cil.visitCilLogicVarUse (self :> Cil.cilVisitor) lv);
                   Cil.SkipChildren
               | TField(finfo, toff') ->
-                  let s = if inside_old_label && (Option.is_some lv.lv_origin) then
-                    (* old_name_struct_field lv toff *)
-                    "old_" ^ get_struct_repr lv toff
-                  else
-                    get_struct_repr lv toff
-                  in
-                  self#print_string s;
+                  self#print_string (get_struct_repr lv toff);
                   Cil.SkipChildren
               | TModel _ ->
                   (* Main.Self.warning ~current:true "Model fields not suppoted"; *)
@@ -1283,12 +1284,9 @@ Cases:
     in *)
     (*Note: If they are logical variables without origin, we assume that they are
     e.g. bounded quantified variables and therefore should not have old prefix*)
-    let s = match (inside_old_label, lv.lv_origin) with
-      | true, Some(vi) ->
-        let deref_str = repeat_str "ptr_" self#get_deref_lvl in
-        "old_" ^ deref_str ^ (get_vi_use_string vi)
-      | false, Some(vi) -> get_vi_use_string vi
-      | _, None -> lv.lv_name
+    let s = match lv.lv_origin with
+      | Some(vi) -> vi.vorig_name
+      | None -> lv.lv_name
     in
       self#print_string s;
       Cil.SkipChildren

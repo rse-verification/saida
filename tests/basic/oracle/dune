@@ -4,4 +4,10 @@
 (rule (target "sum.err.oracle") (mode fallback) (action (write-file "sum.err.oracle" "")))
 (rule (target "sum.res.oracle") (mode fallback) (action (write-file "sum.res.oracle" "")))
 (rule (target "sum.out.c") (mode fallback) (action (write-file "sum.out.c" "")))
+(rule (target "old_predicate.err.oracle") (mode fallback) (action (write-file "old_predicate.err.oracle" "")))
+(rule (target "old_predicate.res.oracle") (mode fallback) (action (write-file "old_predicate.res.oracle" "")))
+(rule (target "old_predicate.out.c") (mode fallback) (action (write-file "old_predicate.out.c" "")))
+(rule (target "simple_ptr.err.oracle") (mode fallback) (action (write-file "simple_ptr.err.oracle" "")))
+(rule (target "simple_ptr.res.oracle") (mode fallback) (action (write-file "simple_ptr.res.oracle" "")))
+(rule (target "simple_ptr.out.c") (mode fallback) (action (write-file "simple_ptr.out.c" "")))
 

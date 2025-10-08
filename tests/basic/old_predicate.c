@@ -3,8 +3,9 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This teset makes sure that \old terms are translated correctly.
-*/
+  This test makes sure that \old predicates are translated correctly.
+ */
+ 
 int g;
 
 int add_one(int x) {
@@ -13,7 +14,7 @@ int add_one(int x) {
 
 /*@
   requires 100 >= g >= 0;
-  ensures g >= \old(g)+2;
+  ensures \old(g >= 0);
 */
 void main() {
   g = add_one(g);
