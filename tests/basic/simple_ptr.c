@@ -18,7 +18,7 @@ int add_one(int *x) {
 
 /*@
   requires \valid(g) && 100 >= *g >= 0;
-  ensures *g >= \old(*g)+2;
+  ensures *g == \old(*g)+2;
 */
 void main() {
   *g = add_one(g);
