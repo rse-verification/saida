@@ -196,7 +196,7 @@ let run () =
         source_w_harness source_fname harness_buff fn_list harness_fname;
         ignore (run_tricera 
           (TriceraPath.get ())
-          false (* (Kernel.LibEntry.get ()) *)
+          (Kernel.LibEntry.get ())
           (TriceraOptions.get ())
           harness_fname result_fname);
         merge_source_w_inferred source_fname fn_list result_fname output_fname;
