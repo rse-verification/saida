@@ -31,37 +31,6 @@ open Cil_datatype
 
 module IntSet = Set.Make(Int)
 
-
-(*Function name for initializing variables non-deterministically
-  in TriCera. Currently only int or int* or struct/union supported *)
-let rec non_det_func_name typ =
-  match typ.tnode with
-    | TInt(_) -> "non_det_int"
-    | TPtr(inner_typ) -> (non_det_func_name inner_typ) ^ "_ptr"
-    | TComp(cinfo) ->  (*union or struct*)
-      let cfull =  (Cil.compFullName cinfo) in
-      let clist = Str.split (Str.regexp "[ \t]+") cfull in
-      "non_det_" ^ (String.concat "_" clist)
-    | TEnum(einfo) -> "non_det_enum_" ^ einfo.eorig_name
-    | TNamed(tinfo) -> "non_det_" ^ tinfo.torig_name
-    | _ -> "Non-supported-type-for-non-det_name"
-
-
-let rec non_det_func_decl_help typ =
-  match typ.tnode with
-    | TInt(_) -> "int"
-    | TPtr(inner_typ) -> (non_det_func_decl_help inner_typ) ^ "*"
-    | TEnum(einfo) -> "enum " ^ einfo.eorig_name
-    | TComp(cinfo) -> (Cil.compFullName cinfo)
-    | TNamed(tinfo) -> tinfo.torig_name
-    | _ -> "Non-supported-type-for-non-det"
-
-
-let non_det_func_decl typ =
-  let func_name = non_det_func_name typ in
-  let s = non_det_func_decl_help typ in
-  "extern " ^ s ^ " " ^ func_name ^ "();"
-
 let is_old_or_pre_logic_label ll =
   match ll with
     | BuiltinLabel(Old) | BuiltinLabel(Pre) -> true
@@ -101,7 +70,8 @@ let rec struct_fields_to_list toff =
     | TModel _ -> ["Model fields not supported in structs"]
     | TIndex _ -> ["arrays not supported in structs"]
 
-(* let rec array_offsets_to_list toff =
+(* FIX ME: Decide what to do with this function:
+let rec array_offsets_to_list toff =
   match toff with
     | TNoOffset -> []
     | TField(finfo , toff') ->
@@ -114,7 +84,7 @@ let rec struct_fields_to_list toff =
       in
         s::(array_offsets_to_list toff') *)
 
-let rec get_struct_repr lv toff =
+let get_struct_repr lv toff =
   let vname = logic_var_name lv in
   let offsetslist = struct_fields_to_list toff in
   vname ^ "." ^ (String.concat "." offsetslist)
@@ -614,20 +584,6 @@ class acsl2tricera out = object (self)
     f ();
     self#print_string ")"
 
-  method print_non_det_funcs gv_list =
-    (* let non_det_int_name = non_det_func_name Cil.intType in
-    self#print_string (Printf.sprintf "extern int %s();\n\n" non_det_int_name);
-    let non_det_int_ptr_name = non_det_func_name Cil.intPtrType in
-    self#print_string ("extern int* %s()" ^ non_det_int_ptr_name ^ ";\n\n"); *)
-    let type_list = List.map (fun vi -> (non_det_func_name vi.vtype , vi.vtype)) gv_list in
-    let type_map = StringMap.of_seq (List.to_seq type_list) in
-    let _ = StringMap.iter
-      (fun _ typp -> self#print_line (non_det_func_decl typp))
-      type_map
-    in
-    self#print_newline;
-
-
   method add_let_var_def b =
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
@@ -642,8 +598,6 @@ class acsl2tricera out = object (self)
         )
         f.globals
     in
-    (*print non-det-ints (only if -lib-entry set) *)
-    let _ = if Kernel.LibEntry.get () then self#print_non_det_funcs global_vars else () in
     (*Set global vars*)
     global_c_vars <- List.filter (fun vi -> not vi.vghost) global_vars;
     global_ghost_vars <- List.filter (fun vi -> vi.vghost) global_vars;
@@ -744,14 +698,10 @@ class acsl2tricera out = object (self)
 
   method print_params_init =
     match curr_func with
-      | Some(curr_func) -> if (List.length curr_func.sformals) > 0 then
-          self#print_line "//Declare the paramters of the function to be called";
-        List.iter
-          (
-            fun vi -> self#print_line (get_var_decl_string vi);
-          )
-          curr_func.sformals;
-      | None -> ();
+      | Some(curr_func) when (List.length curr_func.sformals) > 0 ->
+        self#print_line "//Declare the paramters of the function to be called";
+        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) curr_func.sformals;
+      | _ -> ();
 
   method do_fun_spec hf =
     self#print_harness_fn_name hf;
@@ -759,6 +709,7 @@ class acsl2tricera out = object (self)
     self#incr_indent;
 
     (*Print the initialization of parameters (if any)*)
+    (* FIX ME: Why are we doing this? *)
     self#print_params_init;
     self#print_newline;
 
@@ -769,6 +720,7 @@ class acsl2tricera out = object (self)
     self#print_newline; *)
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
+    (* FIX ME: Why are we doing this? *)
     self#print_log_var_decls hf;
     self#print_newline;
 
