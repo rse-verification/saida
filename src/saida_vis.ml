@@ -83,16 +83,11 @@ type harness_func = {
 
 and harness_block = {
     mutable called_func: string;
-    mutable old_var_inits: (varinfo * int) list;
     mutable log_vars: logic_var list;
 }
 
 let fst (a,b) = a
 let snd (a,b) = b
-
-let create_old_init_instr vi old_vi =
-  let init_exp = Cil.new_exp Location.unknown (Lval(Cil.var vi)) in
-  Local_init(old_vi, AssignInit(SingleInit(init_exp)), Location.unknown)
 
 
 (*Returns a list of all field names
@@ -124,146 +119,6 @@ let rec get_struct_repr lv toff =
   let offsetslist = struct_fields_to_list toff in
   vname ^ "." ^ (String.concat "." offsetslist)
 
-
-(*Class for extracting variables that occurs inside \old in post-conditions *)
-class oldvarsinpostvisitor = object (self)
-  inherit Visitor.frama_c_inplace as super
-  val mutable old_vars = Varinfo.Hashtbl.create 10
-  val mutable inside_old_label = false
-  val mutable deref_lvl = 0
-
-  method incr_deref_lvl = deref_lvl <- deref_lvl + 1
-  method decr_deref_lvl = deref_lvl <- deref_lvl - 1
-
-  method get_deref_lvl = deref_lvl
-
-
-  (*
-    Returns list vi i, where vi is variable used and i is how many levels
-    it is dereferenced WITHIN the old-context. e.g. **\old( **p ) -> (p, 2)
-  *)
-  method get_old_vars =
-    let pair_seq =
-      Seq.map
-      (fun (vi, iset) ->
-        let inner_pair_seq =
-          Seq.map
-            (fun i ->
-              (* let old_vi = Cil.copyVarinfo vi ("old_" ^ deref_in_old_str ^ vi.vorig_name) in
-              let new_vi = Cil.copyVarinfo vi (vi.vorig_name) in
-              (old_vi, new_vi, i) *)
-              (vi, i)
-            )
-          (IntSet.to_seq iset)
-        in List.of_seq inner_pair_seq
-      )
-      (Varinfo.Hashtbl.to_seq old_vars)
-    in
-    List.concat (List.of_seq pair_seq)
-
-  method enter_old_label =
-    let prev_label = inside_old_label in
-    let _ = inside_old_label <- true in
-    prev_label
-
-  method restore_old_label prev_label = inside_old_label <- prev_label;
-
-  method get_old_label = inside_old_label
-
-  method add_vi vi =
-    Options_saida.Self.debug ~level:3 "deref_lvl: %d" self#get_deref_lvl;
-    (* let deref_string = String.make self#get_deref_lvl '*' in *)
-    (* let old_vi = Cil.copyVarinfo vi ("old_" ^ vi.vorig_name) in
-    let new_vi = Cil.copyVarinfo vi vi.vorig_name in *)
-    match Varinfo.Hashtbl.find_opt old_vars vi with
-      | Some(iset) -> Varinfo.Hashtbl.replace old_vars vi
-                        (IntSet.add self#get_deref_lvl iset)
-      | None -> Varinfo.Hashtbl.add old_vars vi
-                  (IntSet.singleton self#get_deref_lvl);
-
-    (* Varinfo.Hashtbl.add old_vars vi self#get_deref_lvl *)
-    (* old_vars new_vi (old_vi, self#get_deref_lvl); *)
-
-  method! vlogic_var_use lv =
-    let _ = match (self#get_old_label, lv.lv_origin) with
-      | true, Some(vi) ->
-        let _ = self#add_vi vi in ()
-      | _ -> ()
-    in
-      Cil.SkipChildren
-
-  method! vpredicate_node pn =
-    match pn with
-      | Pat(p, ll) ->
-          let _ = if is_old_or_pre_logic_label ll then
-              let prev_label = self#enter_old_label in
-              let _ = Cil.visitCilPredicate (self :> Cil.cilVisitor) p in
-              self#restore_old_label prev_label
-          in
-            Cil.SkipChildren
-      | _ -> Cil.DoChildren
-
-  method! vterm_node tn =
-      match tn with
-        | Tat(t, ll) ->
-          let () = if is_old_or_pre_logic_label ll then
-            let prev_label = self#enter_old_label in
-            let _ = Cil.visitCilTerm (self :> Cil.cilVisitor) t in
-            self#restore_old_label prev_label;
-          else ()
-          in
-          Cil.SkipChildren
-        | _ -> Cil.DoChildren
-
-  method! vterm_lval (tlh, toff) =
-    match tlh with
-      | TResult(t) -> Cil.DoChildren
-      | TMem(t) ->
-        let () = if self#get_old_label then
-          let () = self#incr_deref_lvl in
-          let _ = Cil.visitCilTerm (self :> Cil.cilVisitor) t in
-          self#decr_deref_lvl;
-        else
-          let _ = Cil.visitCilTerm (self :> Cil.cilVisitor) t in ()
-        in
-        Cil.SkipChildren
-      | TVar(lv) ->
-        match toff with
-          | TField(finfo, toff') ->
-            (match lv.lv_origin with
-              | Some(vi) ->
-                let () = if inside_old_label then
-                  (* let old_name = old_name_struct_field lv toff in *)
-                  (* self#add_vi_pair vi *)
-                  (* let old_name = ("old_" ^ logic_var_name lv) in *)
-                  (* let old_vi = Cil.copyVarinfo vi old_name in *)
-                  let _ = self#add_vi vi in ()
-                else ()
-                in
-                Cil.SkipChildren
-              | None -> Cil.DoChildren)
-          | _ -> Cil.DoChildren
-end
-
-
-let make_harness_block f_name old_vars log_vars =
-    (* let old_var_list =
-    List.map
-      (fun vi -> Cil.copyVarinfo vi (Format.sprintf "old_%s" vi.vname))
-      c_var_list *)
-  (* in *)
-  (* let old_init_instrs =
-    List.map
-      (fun (vi, old_vi) -> create_old_init_instr vi old_vi)
-      (List.combine c_var_list old_var_list) *)
-  (* let old_var_pairs = List.of_seq (Varinfo.Hashtbl.to_seq old_vars) in
-  let old_var_pairs = List.map (fun (a,b) -> (b,a)) old_var_pairs in *)
-  (* List.combine c_var_list old_var_list *)
-  {
-    called_func = f_name;
-    old_var_inits = old_vars;
-    log_vars = log_vars;
-  }
 
 (* let find_default_behavior behavs =
   let default_behav_list = List.filter
@@ -457,12 +312,6 @@ let logic_vars_from_id_pred_list id_pred_list =
     )
 
 let make_harness_func f_svar behavs =
-  let old_visitor = new oldvarsinpostvisitor in
-  let _ = Visitor.visitFramacFileSameGlobals
-            ((old_visitor) :> Visitor.frama_c_inplace)
-            (Ast.get ())
-  in
-  let old_vars = old_visitor#get_old_vars in
   (*TODO: Fix so that it can deal with different behaviors*)
   let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
   (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
@@ -514,7 +363,7 @@ let make_harness_func f_svar behavs =
       vars_in_pre_list
   in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
-  let h_block = make_harness_block f_svar.vname old_vars all_log_vars in
+  let h_block = { called_func = f_svar.vname; log_vars = all_log_vars} in
   let f_ret_type = match f_svar.vtype.tnode with
     | TFun(r, _, _) -> r
     | _ -> f_svar.vtype (*shouldnt happen*)
@@ -707,7 +556,6 @@ module StringMap = Map.Make(String)
 class acsl2tricera out = object (self)
   inherit Visitor.frama_c_inplace as super
   val mutable pos = PRE     (*Keep track of if we are in pre-or post condition*)
-  val mutable inside_old_label = false
 
   val mutable curr_func = None
   val mutable indent = 0
@@ -765,14 +613,6 @@ class acsl2tricera out = object (self)
     self#print_string (Format.asprintf "$at(Old, (%a)" Printer.pp_typ (Logic_utils.logicCType t));
     f ();
     self#print_string ")"
-
-  method enter_old_label =
-    let prev_label = inside_old_label in
-      inside_old_label <- true;
-      prev_label
-
-  method restore_old_label prev_label =
-    inside_old_label <- prev_label;
 
   method print_non_det_funcs gv_list =
     (* let non_det_int_name = non_det_func_name Cil.intType in
@@ -1026,11 +866,8 @@ class acsl2tricera out = object (self)
       | Pat(p, ll) ->
           let _ = if is_old_or_pre_logic_label ll then
             begin
-              self#print_wrapped_in_old (Cil_types.Ctype {tnode = Cil_types.TInt IChar; tattr = []})
-                (fun () -> 
-                  let prev_label = self#enter_old_label in
-                  ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-                  self#restore_old_label prev_label;)           
+              self#print_wrapped_in_old (Cil_types.Ctype { tnode = Cil_types.TInt IChar; tattr = [] })
+                (fun () -> ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p))
             end
           else
             self#print_string "unsupported predicate label";
@@ -1094,10 +931,7 @@ class acsl2tricera out = object (self)
             begin
               self#print_wrapped_in_old
                 t.term_type
-                (fun () -> 
-                  let prev_label = self#enter_old_label in
-                  ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-                  self#restore_old_label prev_label;);
+                (fun () -> ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t));
             end
           else
             begin
@@ -1175,14 +1009,10 @@ Cases:
                   self#print_string "model-field not supported";
                   Cil.SkipChildren
               | TIndex (t, toff') ->
-                  let _ = if inside_old_label then
-                    self#print_string "array indexing not supported in old-context"
-                  else
-                    let vname = logic_var_name lv in
-                    let _ = self#print_string vname in
-                    self#print_array_indexing toff
-                  in
+                  self#print_string (logic_var_name lv);
+                  self#print_array_indexing toff;
                   Cil.SkipChildren
+
   method print_array_indexing toff =
     match toff with
       | TNoOffset -> ();  (*End of indice sequence*)
@@ -1203,12 +1033,8 @@ Cases:
 
 
   method! vlogic_var_use lv =
-    (* let _ = match lv.lv_origin with
-      | Some vi -> self#print_string (self#get_varinfo_string inside_old_label);
-      | None -> self#print_string self#get_logic_var_string;
-    in *)
-    (*Note: If they are logical variables without origin, we assume that they are
-    e.g. bounded quantified variables and therefore should not have old prefix*)
+    (* Note: If it is a logical variable without origin,
+       it can be e.g. a bounded quantified variables *)
     let s = match lv.lv_origin with
       | Some(vi) -> vi.vorig_name
       | None -> lv.lv_name
