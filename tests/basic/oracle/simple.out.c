@@ -2,7 +2,9 @@
    LOG: @PTEST_NAME@.out.c
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
-
+/*
+  This teset makes sure that \old terms are translated correctly.
+*/
 int g;
 
 /*@
