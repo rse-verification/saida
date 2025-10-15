@@ -50,17 +50,7 @@ module SuppressOldAndPre (X : Printer.PrinterClass) = struct
     object (self)
       inherit X.printer as super
 
-      (* 1) If someone prints a builtin label directly, skip Old/Pre *)
-      (*
-      method! logic_builtin_label fmt (lbl : logic_builtin_label) =
-        match lbl with
-        | Old | Pre -> ()
-        | _ -> super#logic_builtin_label fmt lbl
-      *)
-
-      (* 2) Suppress the \old(...) / \at(..., \old|\pre) term wrapper.
-         In the AST, \old(e) is encoded as Tat (e, BuiltinLabel Old)
-         (similarly \at(e,\pre) as Tat (e, BuiltinLabel Pre)). *)
+      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
       method! term fmt (t : term) =
         match t.term_node with
         | Tat (inner, BuiltinLabel Old)
@@ -339,11 +329,6 @@ let make_harness_func f_svar behavs =
       )
   in
   let vars_in_post_list = Logic_var.Set.elements vars_in_post in
-  (* let c_vars_in_post_list =
-    List.filter_map
-      (fun lv -> lv.lv_origin)
-      vars_in_post_list
-  in *)
   let log_vars_in_post =
     List.filter
       (fun lv ->
@@ -543,21 +528,6 @@ let get_ensures_with_ghost_right_of_impl ensures =
     )
     ensures
 
-(*
-let locic_const_to_string lc =
-  match lc with
-    | Boolean(false) -> Printf.sprintf "%d" 0 (* TriCera does not support "false" yet. *)
-    | Boolean(true) -> Printf.sprintf "%d" 1 (* TriCera does not support "true" yet. *)
-    | Integer(i, _) -> (Integer.to_string i)
-    | LStr(str) -> str
-    | LWStr(_) -> "wide-char-const not supported"
-    | LChr(c) -> Printf.sprintf "%c" c
-    | LReal(r) -> r.r_literal
-    | LEnum(e) -> e.eiorig_name
-*)
-
-
-
 module StringMap = Map.Make(String)
 
 (*
@@ -617,8 +587,7 @@ class acsl2tricera out = object (self)
   method print_line s =
     self#print_indent;
     Format.fprintf out "%s%!\n" s;
-  method print_left_parenth = Format.fprintf out "("
-  method print_right_parenth = Format.fprintf out ")"
+
   method print_newline = Format.fprintf out "\n"
 
   method print_using : 'a. (Format.formatter -> 'a -> unit) -> 'a -> unit =
@@ -663,7 +632,6 @@ class acsl2tricera out = object (self)
     match g with
       | GFun(f, _) ->
         curr_func <- Some f;
-        (*ignore ( Cil.visitCilFunction (self :> Cil.cilVisitor) f);*)
         Cil.DoChildren
       | _ -> Cil.SkipChildren
 
@@ -761,7 +729,12 @@ class acsl2tricera out = object (self)
     self#incr_indent;
 
     (*Print the initialization of parameters (if any)*)
-    (* FIX ME: Why are we doing this? *)
+    (* FIX ME: Having parameters currently breaks the harness.
+        The problem is that the "old" state does not exist for
+        these. We need a two level harness for this. In the outer
+        level we initialize the parameters for the function and
+        send them as arguments to the inner harness function.
+        the inner harness will contain all assumes and asserts. *)
     self#print_params_init;
     self#print_newline;
 
@@ -772,7 +745,6 @@ class acsl2tricera out = object (self)
     self#print_newline; *)
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
-    (* FIX ME: Why are we doing this? *)
     self#print_log_var_decls hf;
     self#print_newline;
 
@@ -898,17 +870,6 @@ class acsl2tricera out = object (self)
       | _ -> self#print_string "unsupported predicate received..";
         Cil.SkipChildren
 
-  (* method! vlogic_info_use li =
-    let v = li.l_var_info in
-    let args = li.l_profile in
-    let def = match li.l_body with
-      | LBterm t -> ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-      | LBpred p -> ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-      | _ -> self#print_string "unsupported_logic_info";
-    in
-    self#print_string "";
-    Cil.SkipChildren *)
-
   method! vterm_node tn =
     let _ =
       match tn with
@@ -1031,13 +992,7 @@ Cases:
       | _ -> self#print_string "found non-index term while printing array indice";
 
   method! vquantifiers q =
-    (* self#print_string "1 == 1";
-    (* List.iter *)
-      (fun x -> Format.fprintf out "%a \\in Int : " Printer.pp_logic_var x;)
-      q; *)
     Cil.SkipChildren
-
-
 
   method! vlogic_var_use lv =
     (* Note: If it is a logical variable without origin,
