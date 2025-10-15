@@ -31,6 +31,47 @@ open Cil_datatype
 
 module IntSet = Set.Make(Int)
 
+module HarnessPrinter (X : Printer.PrinterClass) = struct
+  class printer : Printer.extensible_printer = 
+    object (self)
+      inherit X.printer as super
+
+      method! logic_constant fmt (lc : logic_constant) =
+        match lc with
+        | Boolean(false) -> Format.fprintf fmt "%d" 0 (* TriCera does not support "false" yet. *)
+        | Boolean(true) -> Format.fprintf fmt "%d" 1 (* TriCera does not support "true" yet. *)
+        | _ -> super#logic_constant fmt lc
+
+    end
+end
+
+module SuppressOldAndPre (X : Printer.PrinterClass) = struct
+  class printer : Printer.extensible_printer = 
+    object (self)
+      inherit X.printer as super
+
+      (* 1) If someone prints a builtin label directly, skip Old/Pre *)
+      (*
+      method! logic_builtin_label fmt (lbl : logic_builtin_label) =
+        match lbl with
+        | Old | Pre -> ()
+        | _ -> super#logic_builtin_label fmt lbl
+      *)
+
+      (* 2) Suppress the \old(...) / \at(..., \old|\pre) term wrapper.
+         In the AST, \old(e) is encoded as Tat (e, BuiltinLabel Old)
+         (similarly \at(e,\pre) as Tat (e, BuiltinLabel Pre)). *)
+      method! term fmt (t : term) =
+        match t.term_node with
+        | Tat (inner, BuiltinLabel Old)
+        | Tat (inner, BuiltinLabel Pre) ->
+            (* Drop the wrapper and print the inner term only *)
+            self#term fmt inner
+        | _ ->
+            super#term fmt t
+    end
+end
+
 let is_old_or_pre_logic_label ll =
   match ll with
     | BuiltinLabel(Old) | BuiltinLabel(Pre) -> true
@@ -502,6 +543,7 @@ let get_ensures_with_ghost_right_of_impl ensures =
     )
     ensures
 
+(*
 let locic_const_to_string lc =
   match lc with
     | Boolean(false) -> Printf.sprintf "%d" 0 (* TriCera does not support "false" yet. *)
@@ -512,7 +554,7 @@ let locic_const_to_string lc =
     | LChr(c) -> Printf.sprintf "%c" c
     | LReal(r) -> r.r_literal
     | LEnum(e) -> e.eiorig_name
-
+*)
 
 
 
@@ -579,10 +621,17 @@ class acsl2tricera out = object (self)
   method print_right_parenth = Format.fprintf out ")"
   method print_newline = Format.fprintf out "\n"
 
+  method print_using : 'a. (Format.formatter -> 'a -> unit) -> 'a -> unit =
+    fun pretty_printer value -> pretty_printer out value;
+
   method print_wrapped_in_old (t : logic_type ) (f : unit -> unit) =
+    let old_printer = Printer.current_printer () in
+    Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
     self#print_string (Format.asprintf "$at(Old, (%a)" Printer.pp_typ (Logic_utils.logicCType t));
     f ();
-    self#print_string ")"
+    self#print_string ")";
+    Printer.set_printer old_printer;
+
 
   method add_let_var_def b =
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
@@ -704,6 +753,9 @@ class acsl2tricera out = object (self)
       | _ -> ();
 
   method do_fun_spec hf =
+    let old_printer = Printer.current_printer () in
+    Printer.update_printer (module HarnessPrinter : Printer.PrinterExtension);
+
     self#print_harness_fn_name hf;
     self#print_string "{\n";
     self#incr_indent;
@@ -759,6 +811,8 @@ class acsl2tricera out = object (self)
 
     self#dec_indent;
     self#print_string "}\n";
+
+    Printer.set_printer old_printer;
 
 
   method! vbehavior b =
@@ -859,7 +913,7 @@ class acsl2tricera out = object (self)
     let _ =
       match tn with
         | TConst(lc) ->
-          self#print_string (locic_const_to_string lc);
+          self#print_using Printer.pp_logic_constant lc;
         | TLval(tl) ->
           ignore (Cil.visitCilTermLval (self :> Cil.cilVisitor) tl);
         | TBinOp(bop, t1, t2) ->
@@ -898,12 +952,7 @@ class acsl2tricera out = object (self)
           self#print_string "Unsupported term received";
           term_node_debug_print out tn;
     in
-      (*Dirty fix to print constants properly*)
-      match tn with
-       | TConst(_) -> Cil.DoChildren
-       | _ -> Cil.SkipChildren
-
-
+    Cil.SkipChildren
 
 
 (*
@@ -932,9 +981,15 @@ Cases:
           )
         in
         Cil.SkipChildren
+      | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
+        self#print_wrapped_in_old
+                (Cil.typeOfTermLval  (tlh, toff))
+                (fun () -> self#print_using Printer.pp_term_lval (tlh, toff));
+        (* self#print_string "*"; *)
+        (* ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
+        Cil.SkipChildren
       | TMem(t) ->
-        self#print_string "*";
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        self#print_using Printer.pp_term_lval (tlh, toff);
         Cil.SkipChildren
       | TVar(lv) ->
           (* first, check if it is a let-variable *)

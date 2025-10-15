@@ -9,19 +9,26 @@
  
 int g;
 
-/*@
-  requires g == x;
-  ensures \old(x) - \result == -1 && g - \result == -1 && \old(g) - \result == -1;
-*/
+/*@contract@*/
 int add_one(int x) {
   return x+1;
 }
 
-/*@
-  requires 100 >= g >= 0;
-  ensures \old(g >= 0);
-*/
-void main() {
+
+void main2() {
   g = add_one(g);
   g = add_one(g);
+}
+void main()
+{
+
+
+  //The requires-clauses translated into assumes
+  assume(((100 >= g) && (g >= 0)));
+
+  //Function call that the harness function verifies
+  main2();
+
+  //The ensures-clauses translated into asserts
+  assert($at(Old, (char)(g >= 0)));
 }

@@ -65,7 +65,7 @@ module KeepTempFiles = Self.False
     let help = 
       "Keep temporary files. They will be placed in the same \
        directory as the source file. The name follow the template \
-       'saida_tmp_<random_number>_<source_file_name>'"
+       'saida_{harness|result}_<source_file_name>'"
   end)
 
 (*option for enabling the plugin when running frama-c*)

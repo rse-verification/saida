@@ -160,13 +160,14 @@ let merge_source_w_inferred source_file fn_list result_fname out_fname =
 
 let get_tmp_fname keep_file prefix orig_fname =
   let fname = Filename.basename orig_fname in
-  let tmpdir = if keep_file
-    then Filename.dirname orig_fname
-    else Filename.get_temp_dir_name ()
-  in
-  Filename.temp_file ~temp_dir:tmpdir prefix ("_" ^ fname)
-
-
+  if keep_file then 
+    Filename.concat
+      (Filename.dirname orig_fname)
+      (prefix ^ fname)
+  else 
+    Filename.temp_file 
+      ~temp_dir:(Filename.get_temp_dir_name ()) prefix ("_" ^ fname)
+  
 let get_harness_fname keep_file orig_fname =
   get_tmp_fname keep_file "saida_harness_" orig_fname
 
