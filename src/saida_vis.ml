@@ -30,7 +30,8 @@ open Cil_types
 open Cil_datatype
 
 module IntSet = Set.Make(Int)
-
+(* Printer extension to print 0 and 1 instead of \false and \true,
+   since 0 and 1 is what is used by TriCera *)
 module HarnessPrinter (X : Printer.PrinterClass) = struct
   class printer : Printer.extensible_printer = 
     object (self)
@@ -45,6 +46,8 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
     end
 end
 
+(* Printer extension to remove \old(...) wrapper since TriCera is using
+   a different format. *)
 module SuppressOldAndPre (X : Printer.PrinterClass) = struct
   class printer : Printer.extensible_printer = 
     object (self)
@@ -970,6 +973,7 @@ Cases:
                   ignore ( Cil.visitCilLogicVarUse (self :> Cil.cilVisitor) lv);
                   Cil.SkipChildren
               | TField(finfo, toff') ->
+                  (* self#print_using Printer.pp_term_lval (tlh, toff); *)
                   self#print_string (get_struct_repr lv toff);
                   Cil.SkipChildren
               | TModel _ ->

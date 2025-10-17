@@ -1,0 +1,13 @@
+(rule (target "nested_structs.err.oracle") (mode fallback) (action (write-file "nested_structs.err.oracle" "")))
+(rule (target "nested_structs.res.oracle") (mode fallback) (action (write-file "nested_structs.res.oracle" "")))
+(rule (target "nested_structs.out.c") (mode fallback) (action (write-file "nested_structs.out.c" "")))
+(rule (target "saida_harness_nested_structs.c") (mode fallback) (action (write-file "saida_harness_nested_structs.c" "")))
+(rule (target "mixed_member_ptr.err.oracle") (mode fallback) (action (write-file "mixed_member_ptr.err.oracle" "")))
+(rule (target "mixed_member_ptr.res.oracle") (mode fallback) (action (write-file "mixed_member_ptr.res.oracle" "")))
+(rule (target "mixed_member_ptr.out.c") (mode fallback) (action (write-file "mixed_member_ptr.out.c" "")))
+(rule (target "saida_harness_mixed_member_ptr.c") (mode fallback) (action (write-file "saida_harness_mixed_member_ptr.c" "")))
+(rule (target "nested_struct_ptrs.err.oracle") (mode fallback) (action (write-file "nested_struct_ptrs.err.oracle" "")))
+(rule (target "nested_struct_ptrs.res.oracle") (mode fallback) (action (write-file "nested_struct_ptrs.res.oracle" "")))
+(rule (target "nested_struct_ptrs.out.c") (mode fallback) (action (write-file "nested_struct_ptrs.out.c" "")))
+(rule (target "saida_harness_nested_struct_ptrs.c") (mode fallback) (action (write-file "saida_harness_nested_struct_ptrs.c" "")))
+
