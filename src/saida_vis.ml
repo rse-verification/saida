@@ -47,7 +47,7 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
       (* Print the C name of the variable if it exists, instead of the logic name *)
       method! logic_var fmt (lv : logic_var) =
         match lv.lv_origin with
-        | Some(vi) -> Format.fprintf fmt "%s" vi.vname
+        | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
         | None -> super#logic_var fmt lv
     end
 end
@@ -977,7 +977,7 @@ Cases:
             | None ->
               match toff with
               | TNoOffset ->
-                  ignore ( Cil.visitCilLogicVarUse (self :> Cil.cilVisitor) lv);
+                  self#print_using Printer.pp_term_lval (tlh, toff);
                   Cil.SkipChildren
               | TField(finfo, toff') ->
                   (* self#print_using Printer.pp_term_lval (tlh, toff); *)
@@ -1010,16 +1010,4 @@ Cases:
 
   method! vquantifiers q =
     Cil.SkipChildren
-
-
-  method! vlogic_var_use lv =
-    (* Note: If it is a logical variable without origin,
-       it can be e.g. a bounded quantified variables *)
-    let s = match lv.lv_origin with
-      | Some(vi) -> vi.vorig_name
-      | None -> lv.lv_name
-    in
-      self#print_string s;
-      Cil.SkipChildren
-
 end
