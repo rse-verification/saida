@@ -45,12 +45,10 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
         | _ -> super#logic_constant fmt lc
 
       (* Print the C name of the variable if it exists, instead of the logic name *)
-      (*
       method! logic_var fmt (lv : logic_var) =
         match lv.lv_origin with
         | Some(vi) -> Format.fprintf fmt "%s" vi.vname
         | None -> super#logic_var fmt lv
-      *)
     end
 end
 
