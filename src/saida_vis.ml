@@ -30,19 +30,27 @@ open Cil_types
 open Cil_datatype
 
 module IntSet = Set.Make(Int)
-(* Printer extension to print 0 and 1 instead of \false and \true,
-   since 0 and 1 is what is used by TriCera *)
+
+(* Printer extension to adjust output for TriCera *)
 module HarnessPrinter (X : Printer.PrinterClass) = struct
   class printer : Printer.extensible_printer = 
     object (self)
       inherit X.printer as super
 
+      (* Print 0 and 1 instead of \false and \true, since 0 and 1 is what is used by TriCera *)
       method! logic_constant fmt (lc : logic_constant) =
         match lc with
         | Boolean(false) -> Format.fprintf fmt "%d" 0 (* TriCera does not support "false" yet. *)
         | Boolean(true) -> Format.fprintf fmt "%d" 1 (* TriCera does not support "true" yet. *)
         | _ -> super#logic_constant fmt lc
 
+      (* Print the C name of the variable if it exists, instead of the logic name *)
+      (*
+      method! logic_var fmt (lv : logic_var) =
+        match lv.lv_origin with
+        | Some(vi) -> Format.fprintf fmt "%s" vi.vname
+        | None -> super#logic_var fmt lv
+      *)
     end
 end
 
@@ -117,6 +125,7 @@ let rec array_offsets_to_list toff =
         | _ -> "Only ranges allowed as array indices" (*Shouldnt happen, I think*)
       in
         s::(array_offsets_to_list toff') *)
+
 
 let get_struct_repr lv toff =
   let vname = logic_var_name lv in
@@ -938,7 +947,7 @@ Cases:
                 in self#print_string s
               )
           (** access to the field of a compound type. *)
-          | TModel(_) -> self#print_string "model-field not supported"; (** access to a model field. *)
+          | TModel(_) -> self#print_string "model-field not supported in return"; (** access to a model field. *)
           | TIndex(t, toff') ->
               let _ = self#print_string self#result_string in
               self#print_array_indexing toff;
@@ -974,15 +983,21 @@ Cases:
                   Cil.SkipChildren
               | TField(finfo, toff') ->
                   (* self#print_using Printer.pp_term_lval (tlh, toff); *)
+                  (* 
+                  Options_saida.Self.debug ~level:0 "Printing field access of TVar: %s" (get_struct_repr lv toff);
+                  *)
                   self#print_string (get_struct_repr lv toff);
                   Cil.SkipChildren
               | TModel _ ->
                   (* Main.Self.warning ~current:true "Model fields not suppoted"; *)
-                  self#print_string "model-field not supported";
+                  self#print_string "model-field not supported in lval";
                   Cil.SkipChildren
               | TIndex (t, toff') ->
+                  self#print_using Printer.pp_term_lval (tlh, toff);
+                  (*
                   self#print_string (logic_var_name lv);
                   self#print_array_indexing toff;
+                  *)
                   Cil.SkipChildren
 
   method print_array_indexing toff =
@@ -998,6 +1013,7 @@ Cases:
   method! vquantifiers q =
     Cil.SkipChildren
 
+
   method! vlogic_var_use lv =
     (* Note: If it is a logical variable without origin,
        it can be e.g. a bounded quantified variables *)
@@ -1007,4 +1023,5 @@ Cases:
     in
       self#print_string s;
       Cil.SkipChildren
+
 end
