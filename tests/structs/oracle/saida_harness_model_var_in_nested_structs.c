@@ -20,7 +20,7 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((s.inner.Model fields not supported in structs >= 0));
+  assume((s.innerTModel not supported >= 0));
 
   //Function call that the harness function verifies
   int main_result = main2();

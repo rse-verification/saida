@@ -37,6 +37,12 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
     object (self)
       inherit X.printer as super
 
+      (* Disallow TModel in offsets *)
+      method! term_offset fmt (toff : term_offset) =
+        match toff with
+        | TModel _ -> Format.fprintf fmt "TModel not supported"
+        | _ -> super#term_offset fmt toff
+
       (* Print 0 and 1 instead of \false and \true, since 0 and 1 is what is used by TriCera *)
       method! logic_constant fmt (lc : logic_constant) =
         match lc with
@@ -123,12 +129,6 @@ let rec array_offsets_to_list toff =
         | _ -> "Only ranges allowed as array indices" (*Shouldnt happen, I think*)
       in
         s::(array_offsets_to_list toff') *)
-
-
-let get_struct_repr lv toff =
-  let vname = logic_var_name lv in
-  let offsetslist = struct_fields_to_list toff in
-  vname ^ "." ^ (String.concat "." offsetslist)
 
 
 (* let find_default_behavior behavs =
@@ -980,11 +980,7 @@ Cases:
                   self#print_using Printer.pp_term_lval (tlh, toff);
                   Cil.SkipChildren
               | TField(finfo, toff') ->
-                  (* self#print_using Printer.pp_term_lval (tlh, toff); *)
-                  (* 
-                  Options_saida.Self.debug ~level:0 "Printing field access of TVar: %s" (get_struct_repr lv toff);
-                  *)
-                  self#print_string (get_struct_repr lv toff);
+                  self#print_using Printer.pp_term_lval (tlh, toff);
                   Cil.SkipChildren
               | TModel _ ->
                   (* Main.Self.warning ~current:true "Model fields not suppoted"; *)
@@ -992,10 +988,6 @@ Cases:
                   Cil.SkipChildren
               | TIndex (t, toff') ->
                   self#print_using Printer.pp_term_lval (tlh, toff);
-                  (*
-                  self#print_string (logic_var_name lv);
-                  self#print_array_indexing toff;
-                  *)
                   Cil.SkipChildren
 
   method print_array_indexing toff =
