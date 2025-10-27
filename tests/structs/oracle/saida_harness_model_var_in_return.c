@@ -25,5 +25,5 @@ void main()
   struct S start_result = start();
 
   //The ensures-clauses translated into asserts
-  assert((model-field not supported in return == g_s<TModel offset not supported: y>));
+  assert((start_result<TModel offset not supported: y> == g_s<TModel offset not supported: y>));
 }

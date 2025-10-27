@@ -105,17 +105,6 @@ let fst (a,b) = a
 let snd (a,b) = b
 
 
-(*Returns a list of all field names
-  e.g., a.x.y --> [x,y]
-*)
-let rec struct_fields_to_list toff =
-  match toff with
-    | TNoOffset -> []
-    | TField(finfo , toff') ->
-      finfo.forig_name :: (struct_fields_to_list toff')
-    | TModel _ -> ["Model fields not supported in structs"]
-    | TIndex _ -> ["arrays not supported in structs"]
-
 (* FIX ME: Decide what to do with this function:
 let rec array_offsets_to_list toff =
   match toff with
@@ -933,24 +922,9 @@ Cases:
 
   method! vterm_lval (tlh, toff) =
     match tlh with
-      | TResult(_) ->
-        (* let () = self#print_string self#result_string in *)
-        let () = (match toff with
-          | TNoOffset -> self#print_string self#result_string (** no further offset. *)
-          | TField (fi, toff') ->
-              (
-                let s =
-                  self#result_string ^ "." ^
-                  (String.concat "." (struct_fields_to_list toff))
-                in self#print_string s
-              )
-          (** access to the field of a compound type. *)
-          | TModel(_) -> self#print_string "model-field not supported in return"; (** access to a model field. *)
-          | TIndex(t, toff') ->
-              let _ = self#print_string self#result_string in
-              self#print_array_indexing toff;
-          )
-        in
+      | TResult(typ) ->
+        let tlh'  = TVar(Cil_const.make_logic_var_kind self#result_string LVC (Ctype typ)) in
+        self#print_using Printer.pp_term_lval (tlh', toff);
         Cil.SkipChildren
       | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
         self#print_wrapped_in_old
@@ -975,16 +949,6 @@ Cases:
             | None ->
               self#print_using Printer.pp_term_lval (tlh, toff);
               Cil.SkipChildren
-
-  method print_array_indexing toff =
-    match toff with
-      | TNoOffset -> ();  (*End of indice sequence*)
-      | TIndex(t, toff') ->
-        self#print_string "[";
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        self#print_string "]";
-        self#print_array_indexing toff';
-      | _ -> self#print_string "found non-index term while printing array indice";
 
   method! vquantifiers q =
     Cil.SkipChildren
