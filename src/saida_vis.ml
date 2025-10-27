@@ -40,7 +40,7 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
       (* Disallow TModel in offsets *)
       method! term_offset fmt (toff : term_offset) =
         match toff with
-        | TModel _ -> Format.fprintf fmt "TModel not supported"
+        | TModel (mi, _) -> Format.fprintf fmt "<TModel offset not supported: %s>" mi.mi_name
         | _ -> super#term_offset fmt toff
 
       (* Print 0 and 1 instead of \false and \true, since 0 and 1 is what is used by TriCera *)
@@ -956,8 +956,6 @@ Cases:
         self#print_wrapped_in_old
                 (Cil.typeOfTermLval  (tlh, toff))
                 (fun () -> self#print_using Printer.pp_term_lval (tlh, toff));
-        (* self#print_string "*"; *)
-        (* ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
         Cil.SkipChildren
       | TMem(t) ->
         self#print_using Printer.pp_term_lval (tlh, toff);
@@ -975,20 +973,8 @@ Cases:
               in
               Cil.SkipChildren
             | None ->
-              match toff with
-              | TNoOffset ->
-                  self#print_using Printer.pp_term_lval (tlh, toff);
-                  Cil.SkipChildren
-              | TField(finfo, toff') ->
-                  self#print_using Printer.pp_term_lval (tlh, toff);
-                  Cil.SkipChildren
-              | TModel _ ->
-                  (* Main.Self.warning ~current:true "Model fields not suppoted"; *)
-                  self#print_string "model-field not supported in lval";
-                  Cil.SkipChildren
-              | TIndex (t, toff') ->
-                  self#print_using Printer.pp_term_lval (tlh, toff);
-                  Cil.SkipChildren
+              self#print_using Printer.pp_term_lval (tlh, toff);
+              Cil.SkipChildren
 
   method print_array_indexing toff =
     match toff with

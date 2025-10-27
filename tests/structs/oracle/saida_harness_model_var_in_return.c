@@ -19,11 +19,11 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((model-field not supported in lval >= 0));
+  assume((g_s<TModel offset not supported: y> >= 0));
 
   //Function call that the harness function verifies
   struct S start_result = start();
 
   //The ensures-clauses translated into asserts
-  assert((model-field not supported in return == model-field not supported in lval));
+  assert((model-field not supported in return == g_s<TModel offset not supported: y>));
 }

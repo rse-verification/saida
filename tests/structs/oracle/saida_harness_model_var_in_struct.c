@@ -20,7 +20,7 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((model-field not supported in lval >= 0));
+  assume((s<TModel offset not supported: y> >= 0));
 
   //Function call that the harness function verifies
   int main_result = main2();
