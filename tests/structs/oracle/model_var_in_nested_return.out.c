@@ -29,7 +29,6 @@ struct So id(struct So s) {
   requires g_s.inner.x >=0;
   ensures \result.inner.y == g_s.inner.y ;
 */ 
-//No inferred contract found for start
 struct So start(void) {
   return id(g_s);
 }

@@ -105,21 +105,6 @@ let fst (a,b) = a
 let snd (a,b) = b
 
 
-(* FIX ME: Decide what to do with this function:
-let rec array_offsets_to_list toff =
-  match toff with
-    | TNoOffset -> []
-    | TField(finfo , toff') ->
-      ["struct fields not allowed as indices"] (*Shouldnt happen, I think*)
-    | TModel (_, _) -> ["Model fields not supported in arrays"] (*Shouldnt happen, I think*)
-    | TIndex (t, toff') ->
-      let s = match t.term_node with
-        | Trange(t1, t2) -> "hello"
-        | _ -> "Only ranges allowed as array indices" (*Shouldnt happen, I think*)
-      in
-        s::(array_offsets_to_list toff') *)
-
-
 (* let find_default_behavior behavs =
   let default_behav_list = List.filter
     (fun b -> b.b_name = "default!")
@@ -460,7 +445,7 @@ let get_logic_var_decl_string lv =
 
 
 
-(*Deubigging function to check what type a Term is*)
+(*Debugging function to check what type a Term is*)
 let term_node_debug_print out tn =
     match tn with
         | TConst(lc) -> Format.fprintf out "-1";
@@ -536,7 +521,6 @@ module StringMap = Map.Make(String)
 *)
 class acsl2tricera out = object (self)
   inherit Visitor.frama_c_inplace as super
-  val mutable pos = PRE     (*Keep track of if we are in pre-or post condition*)
 
   val mutable curr_func = None
   val mutable indent = 0

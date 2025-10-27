@@ -13,9 +13,7 @@ struct Si {
   int x;
 };
 
-/*@contract@*/
-struct So start(void) {
-  return id(g_s);
+struct So start(void) {  return id(g_s);
 }
 void main()
 {
