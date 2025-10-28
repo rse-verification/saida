@@ -858,16 +858,20 @@ class acsl2tricera out = object (self)
       | Pvalid(ll, t) ->
         Printer.pp_predicate_node out pn;
         Cil.SkipChildren
-      | _ -> self#print_string "unsupported predicate received..";
-        Cil.SkipChildren
-  
-  method! vterm t =
-    match t.term_node with
-      | Tif (_, _, _) ->
-        self#print_using Printer.pp_term t;
+      | Pif(t, p1, p2) ->
+        self#print_string "(";
+        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        self#print_string " ? ";
+        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
+        self#print_string " : ";
+        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p2);
+        self#print_string ")";
         Cil.SkipChildren
       | _ ->
-        Cil.DoChildren
+        self#print_string "unsupported predicate received >>>";
+        self#print_using Printer.pp_predicate_node pn;
+        self#print_string "<<<";
+        Cil.SkipChildren
 
   method! vterm_node tn =
     let _ =
@@ -903,6 +907,14 @@ class acsl2tricera out = object (self)
             begin
               self#print_string "Currently only old/pre logic labels supported" ;
             end
+        | Tif(c, t1, t2) ->
+          self#print_string "(";
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) c);
+          self#print_string " ? ";
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
+          self#print_string " : ";
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
+          self#print_string ")";
         | TCast(_, _, t) ->
           ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
         | Tlet(b, t) ->
