@@ -38,5 +38,5 @@ void main()
   int start_result = start(s);
 
   //The ensures-clauses translated into asserts
-  assert((start_result == $at(Old, (int)s->x)));
+  assert((start_result == $at(Old, (int)(s->x))));
 }

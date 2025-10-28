@@ -1,1 +1,1 @@
-DEFAULT_SUITES=basic structs
+DEFAULT_SUITES=arrays basic structs

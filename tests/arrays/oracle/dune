@@ -1,0 +1,9 @@
+(rule (target "nondet-init.err.oracle") (mode fallback) (action (write-file "nondet-init.err.oracle" "")))
+(rule (target "nondet-init.res.oracle") (mode fallback) (action (write-file "nondet-init.res.oracle" "")))
+(rule (target "nondet-init.out.c") (mode fallback) (action (write-file "nondet-init.out.c" "")))
+(rule (target "saida_harness_nondet-init.c") (mode fallback) (action (write-file "saida_harness_nondet-init.c" "")))
+(rule (target "array-of-struct.err.oracle") (mode fallback) (action (write-file "array-of-struct.err.oracle" "")))
+(rule (target "array-of-struct.res.oracle") (mode fallback) (action (write-file "array-of-struct.res.oracle" "")))
+(rule (target "array-of-struct.out.c") (mode fallback) (action (write-file "array-of-struct.out.c" "")))
+(rule (target "saida_harness_array-of-struct.c") (mode fallback) (action (write-file "saida_harness_array-of-struct.c" "")))
+

@@ -4,31 +4,36 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \old predicates are translated correctly.
+  Tests that access of struct member values of array elements
+  in ensures clauses is handled correctly.
  */
- 
-int g;
+
+struct S {
+  int x;
+  int y;
+};
+
+struct S s[3];
 
 /*@contract@*/
-int add_one(int x) {
-  return x+1;
+int select_1_x(struct S structs[]) {
+  return structs[1].x ;
 }
 
 
-void main2() {
-  g = add_one(g);
-  g = add_one(g);
+int main2(void) {
+  return select_1_x(s);
 }
 void main()
 {
 
 
   //The requires-clauses translated into assumes
-  assume(((100 >= g) && (g >= 0)));
+  assume((s[1].x >= 0));
 
   //Function call that the harness function verifies
-  main2();
+  int main_result = main2();
 
   //The ensures-clauses translated into asserts
-  assert($at(Old, (char)((g >= 0))));
+  assert((main_result == s[1].x));
 }
