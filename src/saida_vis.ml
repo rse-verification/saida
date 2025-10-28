@@ -31,6 +31,52 @@ open Cil_datatype
 
 module IntSet = Set.Make(Int)
 
+(* Printer extension to adjust output for TriCera *)
+module HarnessPrinter (X : Printer.PrinterClass) = struct
+  class printer : Printer.extensible_printer = 
+    object (self)
+      inherit X.printer as super
+
+      (* Disallow TModel in offsets *)
+      method! term_offset fmt (toff : term_offset) =
+        match toff with
+        | TModel (mi, _) -> Format.fprintf fmt "<TModel offset not supported: %s>" mi.mi_name
+        | _ -> super#term_offset fmt toff
+
+      (* Print 0 and 1 instead of \false and \true, since 0 and 1 is what is used by TriCera *)
+      method! logic_constant fmt (lc : logic_constant) =
+        match lc with
+        | Boolean(false) -> Format.fprintf fmt "%d" 0 (* TriCera does not support "false" yet. *)
+        | Boolean(true) -> Format.fprintf fmt "%d" 1 (* TriCera does not support "true" yet. *)
+        | _ -> super#logic_constant fmt lc
+
+      (* Print the C name of the variable if it exists, instead of the logic name *)
+      method! logic_var fmt (lv : logic_var) =
+        match lv.lv_origin with
+        | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
+        | None -> super#logic_var fmt lv
+    end
+end
+
+(* Printer extension to remove \old(...) wrapper since TriCera is using
+   a different format. *)
+module SuppressOldAndPre (X : Printer.PrinterClass) = struct
+  class printer : Printer.extensible_printer = 
+    object (self)
+      inherit X.printer as super
+
+      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
+      method! term fmt (t : term) =
+        match t.term_node with
+        | Tat (inner, BuiltinLabel Old)
+        | Tat (inner, BuiltinLabel Pre) ->
+            (* Drop the wrapper and print the inner term only *)
+            self#term fmt inner
+        | _ ->
+            super#term fmt t
+    end
+end
+
 let is_old_or_pre_logic_label ll =
   match ll with
     | BuiltinLabel(Old) | BuiltinLabel(Pre) -> true
@@ -57,37 +103,6 @@ and harness_block = {
 
 let fst (a,b) = a
 let snd (a,b) = b
-
-
-(*Returns a list of all field names
-  e.g., a.x.y --> [x,y]
-*)
-let rec struct_fields_to_list toff =
-  match toff with
-    | TNoOffset -> []
-    | TField(finfo , toff') ->
-      finfo.forig_name :: (struct_fields_to_list toff')
-    | TModel _ -> ["Model fields not supported in structs"]
-    | TIndex _ -> ["arrays not supported in structs"]
-
-(* FIX ME: Decide what to do with this function:
-let rec array_offsets_to_list toff =
-  match toff with
-    | TNoOffset -> []
-    | TField(finfo , toff') ->
-      ["struct fields not allowed as indices"] (*Shouldnt happen, I think*)
-    | TModel (_, _) -> ["Model fields not supported in arrays"] (*Shouldnt happen, I think*)
-    | TIndex (t, toff') ->
-      let s = match t.term_node with
-        | Trange(t1, t2) -> "hello"
-        | _ -> "Only ranges allowed as array indices" (*Shouldnt happen, I think*)
-      in
-        s::(array_offsets_to_list toff') *)
-
-let get_struct_repr lv toff =
-  let vname = logic_var_name lv in
-  let offsetslist = struct_fields_to_list toff in
-  vname ^ "." ^ (String.concat "." offsetslist)
 
 
 (* let find_default_behavior behavs =
@@ -298,11 +313,6 @@ let make_harness_func f_svar behavs =
       )
   in
   let vars_in_post_list = Logic_var.Set.elements vars_in_post in
-  (* let c_vars_in_post_list =
-    List.filter_map
-      (fun lv -> lv.lv_origin)
-      vars_in_post_list
-  in *)
   let log_vars_in_post =
     List.filter
       (fun lv ->
@@ -435,7 +445,7 @@ let get_logic_var_decl_string lv =
 
 
 
-(*Deubigging function to check what type a Term is*)
+(*Debugging function to check what type a Term is*)
 let term_node_debug_print out tn =
     match tn with
         | TConst(lc) -> Format.fprintf out "-1";
@@ -502,20 +512,6 @@ let get_ensures_with_ghost_right_of_impl ensures =
     )
     ensures
 
-let locic_const_to_string lc =
-  match lc with
-    | Boolean(false) -> Printf.sprintf "%d" 0 (* TriCera does not support "false" yet. *)
-    | Boolean(true) -> Printf.sprintf "%d" 1 (* TriCera does not support "true" yet. *)
-    | Integer(i, _) -> (Integer.to_string i)
-    | LStr(str) -> str
-    | LWStr(_) -> "wide-char-const not supported"
-    | LChr(c) -> Printf.sprintf "%c" c
-    | LReal(r) -> r.r_literal
-    | LEnum(e) -> e.eiorig_name
-
-
-
-
 module StringMap = Map.Make(String)
 
 (*
@@ -525,7 +521,6 @@ module StringMap = Map.Make(String)
 *)
 class acsl2tricera out = object (self)
   inherit Visitor.frama_c_inplace as super
-  val mutable pos = PRE     (*Keep track of if we are in pre-or post condition*)
 
   val mutable curr_func = None
   val mutable indent = 0
@@ -575,14 +570,20 @@ class acsl2tricera out = object (self)
   method print_line s =
     self#print_indent;
     Format.fprintf out "%s%!\n" s;
-  method print_left_parenth = Format.fprintf out "("
-  method print_right_parenth = Format.fprintf out ")"
+
   method print_newline = Format.fprintf out "\n"
 
+  method print_using : 'a. (Format.formatter -> 'a -> unit) -> 'a -> unit =
+    fun pretty_printer value -> pretty_printer out value;
+
   method print_wrapped_in_old (t : logic_type ) (f : unit -> unit) =
+    let old_printer = Printer.current_printer () in
+    Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
     self#print_string (Format.asprintf "$at(Old, (%a)" Printer.pp_typ (Logic_utils.logicCType t));
     f ();
-    self#print_string ")"
+    self#print_string ")";
+    Printer.set_printer old_printer;
+
 
   method add_let_var_def b =
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
@@ -614,7 +615,6 @@ class acsl2tricera out = object (self)
     match g with
       | GFun(f, _) ->
         curr_func <- Some f;
-        (*ignore ( Cil.visitCilFunction (self :> Cil.cilVisitor) f);*)
         Cil.DoChildren
       | _ -> Cil.SkipChildren
 
@@ -704,12 +704,20 @@ class acsl2tricera out = object (self)
       | _ -> ();
 
   method do_fun_spec hf =
+    let old_printer = Printer.current_printer () in
+    Printer.update_printer (module HarnessPrinter : Printer.PrinterExtension);
+
     self#print_harness_fn_name hf;
     self#print_string "{\n";
     self#incr_indent;
 
     (*Print the initialization of parameters (if any)*)
-    (* FIX ME: Why are we doing this? *)
+    (* FIX ME: Having parameters currently breaks the harness.
+        The problem is that the "old" state does not exist for
+        these. We need a two level harness for this. In the outer
+        level we initialize the parameters for the function and
+        send them as arguments to the inner harness function.
+        the inner harness will contain all assumes and asserts. *)
     self#print_params_init;
     self#print_newline;
 
@@ -720,7 +728,6 @@ class acsl2tricera out = object (self)
     self#print_newline; *)
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
-    (* FIX ME: Why are we doing this? *)
     self#print_log_var_decls hf;
     self#print_newline;
 
@@ -759,6 +766,8 @@ class acsl2tricera out = object (self)
 
     self#dec_indent;
     self#print_string "}\n";
+
+    Printer.set_printer old_printer;
 
 
   method! vbehavior b =
@@ -844,22 +853,11 @@ class acsl2tricera out = object (self)
       | _ -> self#print_string "unsupported predicate received..";
         Cil.SkipChildren
 
-  (* method! vlogic_info_use li =
-    let v = li.l_var_info in
-    let args = li.l_profile in
-    let def = match li.l_body with
-      | LBterm t -> ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-      | LBpred p -> ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-      | _ -> self#print_string "unsupported_logic_info";
-    in
-    self#print_string "";
-    Cil.SkipChildren *)
-
   method! vterm_node tn =
     let _ =
       match tn with
         | TConst(lc) ->
-          self#print_string (locic_const_to_string lc);
+          self#print_using Printer.pp_logic_constant lc;
         | TLval(tl) ->
           ignore (Cil.visitCilTermLval (self :> Cil.cilVisitor) tl);
         | TBinOp(bop, t1, t2) ->
@@ -898,12 +896,7 @@ class acsl2tricera out = object (self)
           self#print_string "Unsupported term received";
           term_node_debug_print out tn;
     in
-      (*Dirty fix to print constants properly*)
-      match tn with
-       | TConst(_) -> Cil.DoChildren
-       | _ -> Cil.SkipChildren
-
-
+    Cil.SkipChildren
 
 
 (*
@@ -913,28 +906,17 @@ Cases:
 
   method! vterm_lval (tlh, toff) =
     match tlh with
-      | TResult(_) ->
-        (* let () = self#print_string self#result_string in *)
-        let () = (match toff with
-          | TNoOffset -> self#print_string self#result_string (** no further offset. *)
-          | TField (fi, toff') ->
-              (
-                let s =
-                  self#result_string ^ "." ^
-                  (String.concat "." (struct_fields_to_list toff))
-                in self#print_string s
-              )
-          (** access to the field of a compound type. *)
-          | TModel(_) -> self#print_string "model-field not supported"; (** access to a model field. *)
-          | TIndex(t, toff') ->
-              let _ = self#print_string self#result_string in
-              self#print_array_indexing toff;
-          )
-        in
+      | TResult(typ) ->
+        let tlh'  = TVar(Cil_const.make_logic_var_kind self#result_string LVC (Ctype typ)) in
+        self#print_using Printer.pp_term_lval (tlh', toff);
+        Cil.SkipChildren
+      | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
+        self#print_wrapped_in_old
+                (Cil.typeOfTermLval  (tlh, toff))
+                (fun () -> self#print_using Printer.pp_term_lval (tlh, toff));
         Cil.SkipChildren
       | TMem(t) ->
-        self#print_string "*";
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        self#print_using Printer.pp_term_lval (tlh, toff);
         Cil.SkipChildren
       | TVar(lv) ->
           (* first, check if it is a let-variable *)
@@ -949,48 +931,9 @@ Cases:
               in
               Cil.SkipChildren
             | None ->
-              match toff with
-              | TNoOffset ->
-                  ignore ( Cil.visitCilLogicVarUse (self :> Cil.cilVisitor) lv);
-                  Cil.SkipChildren
-              | TField(finfo, toff') ->
-                  self#print_string (get_struct_repr lv toff);
-                  Cil.SkipChildren
-              | TModel _ ->
-                  (* Main.Self.warning ~current:true "Model fields not suppoted"; *)
-                  self#print_string "model-field not supported";
-                  Cil.SkipChildren
-              | TIndex (t, toff') ->
-                  self#print_string (logic_var_name lv);
-                  self#print_array_indexing toff;
-                  Cil.SkipChildren
-
-  method print_array_indexing toff =
-    match toff with
-      | TNoOffset -> ();  (*End of indice sequence*)
-      | TIndex(t, toff') ->
-        self#print_string "[";
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        self#print_string "]";
-        self#print_array_indexing toff';
-      | _ -> self#print_string "found non-index term while printing array indice";
+              self#print_using Printer.pp_term_lval (tlh, toff);
+              Cil.SkipChildren
 
   method! vquantifiers q =
-    (* self#print_string "1 == 1";
-    (* List.iter *)
-      (fun x -> Format.fprintf out "%a \\in Int : " Printer.pp_logic_var x;)
-      q; *)
     Cil.SkipChildren
-
-
-
-  method! vlogic_var_use lv =
-    (* Note: If it is a logical variable without origin,
-       it can be e.g. a bounded quantified variables *)
-    let s = match lv.lv_origin with
-      | Some(vi) -> vi.vorig_name
-      | None -> lv.lv_name
-    in
-      self#print_string s;
-      Cil.SkipChildren
 end
