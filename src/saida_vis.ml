@@ -87,6 +87,12 @@ let logic_var_name lv =
     | Some(vi) -> vi.vname
     | None -> lv.lv_name
 
+let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
+  match lt with
+  | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
+  | _ -> lt
+
+
 type harness_func = {
   mutable name: string;
   mutable block: harness_block;
@@ -579,9 +585,11 @@ class acsl2tricera out = object (self)
   method print_wrapped_in_old (t : logic_type ) (f : unit -> unit) =
     let old_printer = Printer.current_printer () in
     Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
-    self#print_string (Format.asprintf "$at(Old, (%a)" Printer.pp_typ (Logic_utils.logicCType t));
+    self#print_string 
+      (Format.asprintf "$at(Old, (%a)(" 
+        Printer.pp_typ (Logic_utils.logicCType (to_c_type t)));
     f ();
-    self#print_string ")";
+    self#print_string "))";
     Printer.set_printer old_printer;
 
 
@@ -762,7 +770,7 @@ class acsl2tricera out = object (self)
         | None -> ();
     in
     (*Print the asserts, from the post-cond*)
-      self#print_ensure_asserts hf;
+    self#print_ensure_asserts hf;
 
     self#dec_indent;
     self#print_string "}\n";
@@ -852,6 +860,14 @@ class acsl2tricera out = object (self)
         Cil.SkipChildren
       | _ -> self#print_string "unsupported predicate received..";
         Cil.SkipChildren
+  
+  method! vterm t =
+    match t.term_node with
+      | Tif (_, _, _) ->
+        self#print_using Printer.pp_term t;
+        Cil.SkipChildren
+      | _ ->
+        Cil.DoChildren
 
   method! vterm_node tn =
     let _ =

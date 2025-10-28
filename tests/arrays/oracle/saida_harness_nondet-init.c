@@ -25,5 +25,5 @@ void main()
   func();
 
   //The ensures-clauses translated into asserts
-  assert((a[1] == ($at(Old, (int)a[1]) + 1)));
+  assert((a[1] == ($at(Old, (int)(a[1])) + 1)));
 }
