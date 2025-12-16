@@ -24,7 +24,7 @@ struct So *p = &outer;
 
 /*@
   requires \true;
-  ensures \old(inner) == inner;
+  ensures inner == \old(inner);
 */
 int select_inner_x(struct So *s) {
   return s->inner->x ;
