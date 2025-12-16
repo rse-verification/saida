@@ -23,5 +23,5 @@ void main()
   int func_result = func(a);
 
   //The ensures-clauses translated into asserts
-  assert((func_result == $at(Old, (char)(a))));
+  assert((func_result == $at("Old", (char)(a))));
 }
