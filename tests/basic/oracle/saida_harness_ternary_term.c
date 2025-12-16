@@ -23,5 +23,5 @@ void main()
   int main_result = main2();
 
   //The ensures-clauses translated into asserts
-  assert((((($at(Old, (int)(t)) >= 0xF0) ? 1 : 0) != 0) == 1));
+  assert((((($at("Old", (int)(t)) >= 0xF0) ? 1 : 0) != 0) == 1));
 }

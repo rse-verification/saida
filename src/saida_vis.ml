@@ -559,7 +559,7 @@ class acsl2tricera out = object (self)
     let old_printer = Printer.current_printer () in
     Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
     self#print_string 
-      (Format.asprintf "$at(Old, (%a)(" 
+      (Format.asprintf "$at(\"Old\", (%a)(" 
         Printer.pp_typ (Logic_utils.logicCType (to_c_type t)));
     f ();
     self#print_string "))";

@@ -30,5 +30,5 @@ void main()
   main2();
 
   //The ensures-clauses translated into asserts
-  assert($at(Old, (char)((g >= 0))));
+  assert($at("Old", (char)((g >= 0))));
 }
