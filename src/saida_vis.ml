@@ -303,51 +303,25 @@ let logic_vars_from_id_pred_list id_pred_list =
     )
 
 let make_harness_func f_svar behavs =
+  let get_logic_vars (predicates: identified_predicate list): logic_var list = 
+    predicates
+    |> List.map (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
+    |> List.fold_left Logic_var.Set.union Logic_var.Set.empty
+    |> Logic_var.Set.elements
+    |> List.filter
+        (fun lv ->
+          match lv.lv_origin with
+          | Some(_) -> false
+          | None -> true
+        )
+  in
   (*TODO: Fix so that it can deal with different behaviors*)
   let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
   (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
   let asserts = List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs) in
   (*TODO: Extract vars only in \old-context instead*)
-  let vars_in_post =
-    List.fold_left
-      Logic_var.Set.union
-      Logic_var.Set.empty
-      (
-        List.map
-          (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
-          asserts
-      )
-  in
-  let vars_in_post_list = Logic_var.Set.elements vars_in_post in
-  let log_vars_in_post =
-    List.filter
-      (fun lv ->
-        match lv.lv_origin with
-          | Some(_) -> false
-          | None -> true
-      )
-      vars_in_post_list
-  in
-  let vars_in_pre =
-    List.fold_left
-      Logic_var.Set.union
-      Logic_var.Set.empty
-      (
-        List.map
-          (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
-          assumes
-      )
-  in
-  let vars_in_pre_list = Logic_var.Set.elements vars_in_pre in
-  let log_vars_in_pre =
-    List.filter
-      (fun lv ->
-        match lv.lv_origin with
-          | Some(_) -> false
-          | None -> true
-      )
-      vars_in_pre_list
-  in
+  let log_vars_in_post = get_logic_vars asserts in
+  let log_vars_in_pre = get_logic_vars assumes in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
   let h_block = { called_func = f_svar.vname; log_vars = all_log_vars} in
   let f_ret_type = match f_svar.vtype.tnode with
@@ -554,7 +528,6 @@ class acsl2tricera out = object (self)
               (Ast.get ())
     in fn_list
 
-
   method get_curr_func_name =
     match curr_func with
       | Some f -> f.svar.vname
@@ -608,8 +581,10 @@ class acsl2tricera out = object (self)
         f.globals
     in
     (*Set global vars*)
-    global_c_vars <- List.filter (fun vi -> not vi.vghost) global_vars;
-    global_ghost_vars <- List.filter (fun vi -> vi.vghost) global_vars;
+    let (c_vars, ghost_vars) = 
+      List.partition (fun vi -> vi.vghost) global_vars in
+    global_c_vars <- c_vars;
+    global_ghost_vars <- ghost_vars;
     fn_list <- List.filter_map
         (fun g ->
           match g with
