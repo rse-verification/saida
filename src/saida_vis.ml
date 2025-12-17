@@ -504,8 +504,6 @@ class acsl2tricera out = object (self)
 
   val mutable curr_func = None
   val mutable indent = 0
-  val mutable global_c_vars = []
-  val mutable global_ghost_vars = []
 
   val mutable fn_list = [];
 
@@ -570,21 +568,6 @@ class acsl2tricera out = object (self)
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
   method! vfile f =
-    let global_vars =
-      List.filter_map
-        (
-          fun g ->
-            match g with
-              | GVar(vi, _, _) -> Some vi
-              | _ -> None
-        )
-        f.globals
-    in
-    (*Set global vars*)
-    let (c_vars, ghost_vars) = 
-      List.partition (fun vi -> vi.vghost) global_vars in
-    global_c_vars <- c_vars;
-    global_ghost_vars <- ghost_vars;
     fn_list <- List.filter_map
         (fun g ->
           match g with
@@ -619,18 +602,6 @@ class acsl2tricera out = object (self)
 
   method print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
-
-  (* Currently not used, global ghost variables are introduced in main.ml *)
-  method print_global_ghost_vars_decl =
-    if (List.length global_ghost_vars) > 0 then
-      self#print_line "//Declaring all global ghost vars";
-      (*Assumes that ghost vars have unique names (which they should have)*)
-    List.iter
-      (fun vi ->
-        self#print_string (get_var_decl_string vi);
-        self#print_newline;
-      )
-      global_ghost_vars;
 
   method print_require_assumes hf =
     if (List.length hf.assumes) > 0 then
