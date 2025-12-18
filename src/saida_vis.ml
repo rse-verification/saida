@@ -98,6 +98,7 @@ type harness_func = {
   mutable block: harness_block;
   mutable assumes: Cil_types.identified_predicate list;
   mutable asserts: Cil_types.identified_predicate list;
+  mutable params: Cil_types.varinfo list;
   mutable return_type: Cil_types.typ
   (* mutable ghost_vars_right_of_impl_in_post : logic_var list; *)
 }
@@ -302,7 +303,7 @@ let logic_vars_from_id_pred_list id_pred_list =
         id_pred_list
     )
 
-let make_harness_func f_svar behavs =
+let make_harness_func fdec behavs =
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 
     predicates
     |> List.map (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
@@ -323,10 +324,10 @@ let make_harness_func f_svar behavs =
   let log_vars_in_post = get_logic_vars asserts in
   let log_vars_in_pre = get_logic_vars assumes in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
-  let h_block = { called_func = f_svar.vname; log_vars = all_log_vars} in
-  let f_ret_type = match f_svar.vtype.tnode with
+  let h_block = { called_func = fdec.svar.vname; log_vars = all_log_vars} in
+  let f_ret_type = match fdec.svar.vtype.tnode with
     | TFun(r, _, _) -> r
-    | _ -> f_svar.vtype (*shouldnt happen*)
+    | _ -> fdec.svar.vtype (*shouldnt happen*)
   in
   {
     (* name = Printf.sprintf "%s_harness" f_name; *)
@@ -334,6 +335,7 @@ let make_harness_func f_svar behavs =
     block = h_block;
     assumes = assumes;
     asserts = asserts;
+    params = fdec.sformals;
     return_type = f_ret_type;
     (* ghost_vars_right_of_impl_in_post = []; *)
   }
@@ -494,6 +496,10 @@ let get_ensures_with_ghost_right_of_impl ensures =
 
 module StringMap = Map.Make(String)
 
+type src_data = {
+  fundec_locations: (string * location) list;
+  harness_functions: harness_func list;
+}
 (*
   Class for pretty printing function contracts as harness function with
   assume and asserts in tricera style, inspired by Frama-C development guide:
@@ -506,6 +512,7 @@ class acsl2tricera out = object (self)
   val mutable indent = 0
 
   val mutable fn_list = [];
+  val mutable hf_list = [];
 
   val mutable deref_lvl = 0;
 
@@ -526,17 +533,7 @@ class acsl2tricera out = object (self)
               (Ast.get ())
     in fn_list
 
-  method get_func_name func =
-    match func with
-      | Some f -> f.svar.vname
-      | None -> "FUNC_MISSING"
-
-  method get_func_svar func =
-    match func with
-      | Some f -> f.svar
-      | None -> Cil.makeGlobalVar "FUNC_MISSING" Cil_const.voidType
-
-  method result_string func = (self#get_func_name func) ^ "_result";
+  method result_string fname = fname ^ "_result";
 
   method print_indent =
   for _ = 1 to indent do
@@ -594,8 +591,9 @@ class acsl2tricera out = object (self)
       begin
         (* FIX ME: Currently prints a "main" function for each function 
              in the source that has ACSL annotation. *)
-        let har_func = make_harness_func (self#get_func_svar curr_func) s.spec_behavior in
-        self#do_fun_spec har_func;
+        let hf = (make_harness_func (Option.get(curr_func)) s.spec_behavior) in
+        hf_list <- hf::hf_list;
+        self#do_fun_spec hf;
       end
     in
     Cil.SkipChildren
@@ -650,12 +648,12 @@ class acsl2tricera out = object (self)
       (fun lv -> self#print_line (get_logic_var_decl_string lv))
       log_vars
 
-  method print_params_init func =
-    match func with
-      | Some(func) when (List.length func.sformals) > 0 ->
+  method print_params_init hf =
+    match hf.params with
+    | [] -> ()
+    | params ->
         self#print_line "//Declare the paramters of the function to be called";
-        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) func.sformals;
-      | _ -> ();
+        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) params;
 
   method do_fun_spec hf =
     let old_printer = Printer.current_printer () in
@@ -672,7 +670,7 @@ class acsl2tricera out = object (self)
         level we initialize the parameters for the function and
         send them as arguments to the inner harness function.
         the inner harness will contain all assumes and asserts. *)
-    self#print_params_init curr_func;
+    self#print_params_init hf;
     self#print_newline;
 
     (*Print the declaration of ghost-variables*)
@@ -696,25 +694,22 @@ class acsl2tricera out = object (self)
 
     (*Print the function call to the function we are harness for*)
     self#print_line "//Function call that the harness function verifies";
-    let _ =
-      match curr_func with
-        | Some(func) ->
-          let params =
-            String.concat ", " (List.map (fun vi -> vi.vname) func.sformals)
-          in
-          (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
-          (*Quick fix main2 for working in tricera*)
-          let s = match hf.return_type.tnode with
-            | TVoid -> ""
-            | _ -> (get_type_decl_string hf.return_type) ^ " " ^ (self#result_string (Some func)) ^ " = "
-          in
-          let fname = func.svar.vname in
-          if fname = "main" then
-            self#print_line (s ^ "main2("^ params ^");\n")
-          else
-            self#print_line (s ^ fname ^ "("^ params ^");\n");
-        | None -> ();
+
+    let params =
+      String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
     in
+    (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
+    (*Quick fix main2 for working in tricera*)
+    let s = match hf.return_type.tnode with
+      | TVoid -> ""
+      | _ -> (get_type_decl_string hf.return_type) ^ " " ^ (self#result_string hf.block.called_func) ^ " = "
+    in
+    let fname = hf.block.called_func in
+    if fname = "main" then
+      self#print_line (s ^ "main2("^ params ^");\n")
+    else
+      self#print_line (s ^ fname ^ "("^ params ^");\n");
+
     (*Print the asserts, from the post-cond*)
     self#print_ensure_asserts hf;
 
@@ -881,7 +876,7 @@ Cases:
   method! vterm_lval (tlh, toff) =
     match tlh with
       | TResult(typ) ->
-        let tlh'  = TVar(Cil_const.make_logic_var_kind (self#result_string curr_func) LVC (Ctype typ)) in
+        let tlh'  = TVar(Cil_const.make_logic_var_kind (self#result_string (Option.get(curr_func)).svar.vname) LVC (Ctype typ)) in
         self#print_using Printer.pp_term_lval (tlh', toff);
         Cil.SkipChildren
       | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
