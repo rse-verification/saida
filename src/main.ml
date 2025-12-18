@@ -165,10 +165,16 @@ let get_result_fname keep_file orig_fname =
 let run () =
   try
   if Enabled.get () then
+
+    let a2t = new acsl2tricera in
+    let { fundec_locations = fn_list
+        ; harness_functions = hf_list
+        } = a2t#translate (Ast.get ()) in
+
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
-    let a2t = new acsl2tricera fmt in
-    let fn_list = a2t#translate in
+    let pt = new tricera_print fmt in
+    pt#do_fun_spec (List.hd(hf_list));
     let _ = Format.pp_print_flush fmt () in
     let output_fname = OutputFile.get () in
     match Kernel.Files.get () with

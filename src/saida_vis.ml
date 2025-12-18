@@ -329,14 +329,13 @@ let make_harness_func fdec behavs =
     | TFun(r, _, _) -> r
     | _ -> fdec.svar.vtype (*shouldnt happen*)
   in
-  {
+  { name = "main"
     (* name = Printf.sprintf "%s_harness" f_name; *)
-    name = "main";
-    block = h_block;
-    assumes = assumes;
-    asserts = asserts;
-    params = fdec.sformals;
-    return_type = f_ret_type;
+  ; block = h_block
+  ; assumes = assumes
+  ; asserts = asserts
+  ; params = fdec.sformals
+  ; return_type = f_ret_type;
     (* ghost_vars_right_of_impl_in_post = []; *)
   }
 
@@ -505,7 +504,7 @@ type src_data = {
   assume and asserts in tricera style, inspired by Frama-C development guide:
     https://frama-c.com/download/frama-c-plugin-development-guide.pdf
 *)
-class acsl2tricera out = object (self)
+class acsl2tricera = object (self)
   inherit Visitor.frama_c_inplace as super
 
   val mutable curr_func = None
@@ -513,6 +512,51 @@ class acsl2tricera out = object (self)
 
   val mutable fn_list = [];
   val mutable hf_list = [];
+
+  (*This is the main function intended to be called upon creation*)
+  method translate file =
+    let _ = Visitor.visitFramacFileSameGlobals
+              ((self) :> Visitor.frama_c_inplace)
+              (file)
+    in 
+    { fundec_locations = fn_list
+    ; harness_functions = hf_list
+    }
+
+  method! vfile f =
+    fn_list <- List.filter_map
+        (fun g ->
+          match g with
+            | GFun(f, loc) -> Some((f.svar.vorig_name, loc))
+            | _ -> None
+        )
+      f.globals;
+    Cil.DoChildren
+
+  method! vglob_aux g =
+    match g with
+      | GFun(f, _) ->
+        curr_func <- Some f;
+        Cil.DoChildren
+      | _ -> Cil.SkipChildren
+
+  method! vfunc f =
+    Cil.SkipChildren
+
+  (*Spec visited from here*)
+  method! vspec s =
+    if (List.length s.spec_behavior) > 0 then 
+      hf_list <- (make_harness_func (Option.get(curr_func)) s.spec_behavior)::hf_list;
+    Cil.SkipChildren
+end
+
+
+class tricera_print out = object (self)
+  inherit Visitor.frama_c_inplace as super
+
+  val mutable curr_func_name = "";
+
+  val mutable indent = 0
 
   val mutable deref_lvl = 0;
 
@@ -525,13 +569,6 @@ class acsl2tricera out = object (self)
 
   method incr_indent = indent <- indent + 1;
   method dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
-
-  (*This is the main function intended to be called upon creation*)
-  method translate =
-    let _ = Visitor.visitFramacFileSameGlobals
-              ((self) :> Visitor.frama_c_inplace)
-              (Ast.get ())
-    in fn_list
 
   method result_string fname = fname ^ "_result";
 
@@ -563,40 +600,6 @@ class acsl2tricera out = object (self)
 
   method add_let_var_def b =
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
-
-  method! vfile f =
-    fn_list <- List.filter_map
-        (fun g ->
-          match g with
-            | GFun(f, loc) -> Some((f.svar.vorig_name, loc))
-            | _ -> None
-        )
-      f.globals;
-    Cil.DoChildren
-
-  method! vglob_aux g =
-    match g with
-      | GFun(f, _) ->
-        curr_func <- Some f;
-        Cil.DoChildren
-      | _ -> Cil.SkipChildren
-
-
-  method! vfunc f =
-    Cil.SkipChildren
-
-  (*Spec visited from here*)
-  method! vspec s =
-    let _ = if (List.length s.spec_behavior) > 0 then
-      begin
-        (* FIX ME: Currently prints a "main" function for each function 
-             in the source that has ACSL annotation. *)
-        let hf = (make_harness_func (Option.get(curr_func)) s.spec_behavior) in
-        hf_list <- hf::hf_list;
-        self#do_fun_spec hf;
-      end
-    in
-    Cil.SkipChildren
 
   method print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
@@ -656,6 +659,7 @@ class acsl2tricera out = object (self)
         List.iter (fun vi -> self#print_line (get_var_decl_string vi)) params;
 
   method do_fun_spec hf =
+    curr_func_name <- hf.block.called_func;
     let old_printer = Printer.current_printer () in
     Printer.update_printer (module HarnessPrinter : Printer.PrinterExtension);
 
@@ -876,7 +880,7 @@ Cases:
   method! vterm_lval (tlh, toff) =
     match tlh with
       | TResult(typ) ->
-        let tlh'  = TVar(Cil_const.make_logic_var_kind (self#result_string (Option.get(curr_func)).svar.vname) LVC (Ctype typ)) in
+        let tlh'  = TVar(Cil_const.make_logic_var_kind (self#result_string curr_func_name) LVC (Ctype typ)) in
         self#print_using Printer.pp_term_lval (tlh', toff);
         Cil.SkipChildren
       | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
