@@ -28,14 +28,8 @@ let ghost_regex = Str.regexp ".*//@ ghost"
 
 (*NOTE: All regexes expect strings trimmed from leading/trailing whitespace*)
 
-let fn_regex = Str.regexp
-      ("^\\(\\(void\\)\\|\\(int\\)\\|\\(float\\)\\|\\(double\\)\\|"
-      ^ "\\(enum [a-zA-Z_][a-zA-Z0-9_]*\\)\\|\\(struct [a-zA-Z_][0-9a-zA-Z_]*\\)\\) (.*)$?")
-let main_regex = Str.regexp ".*main.*(.*)$?"
-let entry_regex () = Str.regexp ".*entry.*(.*)$?"
 
 let get_fn_name s =
-  (* Scanf.sscanf s "%s %s()%s" (fun _ x _ -> x) *)
   let m = Str.string_match (Str.regexp {|.* \(.+\)(.*\($\|).*\)|}) s 0 in
   if m = true then
     (
@@ -77,11 +71,9 @@ let rec add_contract_annots ic buff in_acsl line fn_list =
               (match line_to_fun_def line fn_list with
                 | Some _ ->
                   let name = get_fn_name s' in
-                  (* if (Str.string_match main_regex s' 0) then *)
                   if name = "main" then
                     ((Str.replace_first (Str.regexp "main") "main2" s) ^ "\n", false)
                   else
-                    (* if (Str.string_match (entry_regex ()) s' 0) |> not then *)
                     (Self.debug ~level:3 "name:%s %s" name (Kernel.MainFunction.get ());
                     if not(name = Kernel.MainFunction.get ()) then
                       (
