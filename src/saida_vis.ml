@@ -526,17 +526,17 @@ class acsl2tricera out = object (self)
               (Ast.get ())
     in fn_list
 
-  method get_curr_func_name =
-    match curr_func with
+  method get_func_name func =
+    match func with
       | Some f -> f.svar.vname
       | None -> "FUNC_MISSING"
 
-  method get_curr_func_svar =
-    match curr_func with
+  method get_func_svar func =
+    match func with
       | Some f -> f.svar
       | None -> Cil.makeGlobalVar "FUNC_MISSING" Cil_const.voidType
 
-  method result_string = self#get_curr_func_name ^ "_result";
+  method result_string func = (self#get_func_name func) ^ "_result";
 
   method print_indent =
   for _ = 1 to indent do
@@ -594,7 +594,7 @@ class acsl2tricera out = object (self)
       begin
         (* FIX ME: Currently prints a "main" function for each function 
              in the source that has ACSL annotation. *)
-        let har_func = make_harness_func self#get_curr_func_svar s.spec_behavior in
+        let har_func = make_harness_func (self#get_func_svar curr_func) s.spec_behavior in
         self#do_fun_spec har_func;
       end
     in
@@ -650,11 +650,11 @@ class acsl2tricera out = object (self)
       (fun lv -> self#print_line (get_logic_var_decl_string lv))
       log_vars
 
-  method print_params_init =
-    match curr_func with
-      | Some(curr_func) when (List.length curr_func.sformals) > 0 ->
+  method print_params_init func =
+    match func with
+      | Some(func) when (List.length func.sformals) > 0 ->
         self#print_line "//Declare the paramters of the function to be called";
-        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) curr_func.sformals;
+        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) func.sformals;
       | _ -> ();
 
   method do_fun_spec hf =
@@ -672,7 +672,7 @@ class acsl2tricera out = object (self)
         level we initialize the parameters for the function and
         send them as arguments to the inner harness function.
         the inner harness will contain all assumes and asserts. *)
-    self#print_params_init;
+    self#print_params_init curr_func;
     self#print_newline;
 
     (*Print the declaration of ghost-variables*)
@@ -698,17 +698,17 @@ class acsl2tricera out = object (self)
     self#print_line "//Function call that the harness function verifies";
     let _ =
       match curr_func with
-        | Some(curr_func) ->
+        | Some(func) ->
           let params =
-            String.concat ", " (List.map (fun vi -> vi.vname) curr_func.sformals)
+            String.concat ", " (List.map (fun vi -> vi.vname) func.sformals)
           in
           (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
           (*Quick fix main2 for working in tricera*)
           let s = match hf.return_type.tnode with
             | TVoid -> ""
-            | _ -> (get_type_decl_string hf.return_type) ^ " " ^ self#result_string ^ " = "
+            | _ -> (get_type_decl_string hf.return_type) ^ " " ^ (self#result_string (Some func)) ^ " = "
           in
-          let fname = curr_func.svar.vname in
+          let fname = func.svar.vname in
           if fname = "main" then
             self#print_line (s ^ "main2("^ params ^");\n")
           else
@@ -881,7 +881,7 @@ Cases:
   method! vterm_lval (tlh, toff) =
     match tlh with
       | TResult(typ) ->
-        let tlh'  = TVar(Cil_const.make_logic_var_kind self#result_string LVC (Ctype typ)) in
+        let tlh'  = TVar(Cil_const.make_logic_var_kind (self#result_string curr_func) LVC (Ctype typ)) in
         self#print_using Printer.pp_term_lval (tlh', toff);
         Cil.SkipChildren
       | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
