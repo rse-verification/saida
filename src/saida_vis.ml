@@ -31,6 +31,30 @@ open Cil_datatype
 
 module IntSet = Set.Make(Int)
 
+let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
+  match lt with
+  | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
+  | _ -> lt
+
+(* Printer extension to remove \old(...) wrapper since TriCera is using
+   a different format. *)
+module SuppressOldAndPre (X : Printer.PrinterClass) = struct
+  class printer : Printer.extensible_printer = 
+    object (self)
+      inherit X.printer as super
+
+      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
+      method! term fmt (t : term) =
+        match t.term_node with
+        | Tat (inner, BuiltinLabel Old)
+        | Tat (inner, BuiltinLabel Pre) ->
+            (* Drop the wrapper and print the inner term only *)
+            self#term fmt inner
+        | _ ->
+            super#term fmt t
+    end
+end
+
 (* Printer extension to adjust output for TriCera *)
 module HarnessPrinter (X : Printer.PrinterClass) = struct
   class printer : Printer.extensible_printer = 
@@ -55,27 +79,53 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
         match lv.lv_origin with
         | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
         | None -> super#logic_var fmt lv
+
+      (* ??? Supress quantifiers *)
+      method! quantifiers fmt (qfs : logic_var list) =
+        ()
+
+      val context_func_name = "CURRENT_FUNC_NAME"
+      val mutable let_var_defs = Logic_var.Hashtbl.create 10
+
+      method private result_string (fname : string) =
+        fname ^ "_result";
+
+      method private print_wrapped_in_old fmt ll (t : logic_type ) (f : Format.formatter -> unit -> unit) =
+        let old_printer = Printer.current_printer () in
+        Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
+        Format.fprintf fmt "$at(\"%a\", (%a)(%a))"
+            super#logic_label ll
+            (self#typ None) (Logic_utils.logicCType (to_c_type t))
+            f ();
+        Format.fprintf fmt "))";
+        Printer.set_printer old_printer;
+
+      method! term_lval fmt (tlh, toff) =
+        match tlh with
+        | TResult(typ) ->
+            let tlh' = TVar(Cil_const.make_logic_var_kind (self#result_string context_func_name) LVC (Ctype typ)) in
+            super#term_lval fmt (tlh', toff);
+        | TMem({term_node = Tat(t,ll); _}) ->
+            self#print_wrapped_in_old fmt ll
+                  (Cil.typeOfTermLval  (tlh, toff))
+                  (fun fmt _ -> super#term_lval fmt (tlh, toff));
+        | TMem(t) ->
+          super#term_lval fmt (tlh, toff);
+        | TVar(lv) ->
+            (* first, check if it is a let-variable *)
+            (Options_saida.Self.debug ~level:3 "looking up let var: %s" lv.lv_name);
+            match Logic_var.Hashtbl.find_opt let_var_defs lv with
+            | Some(l_body) ->
+               (match l_body with
+                | LBterm(t) -> self#term  fmt t;
+                | LBpred(p) -> self#predicate fmt p;
+                | _ -> ()  (*Shouldnt happen*))
+            | None ->
+                super#term_lval fmt (tlh, toff);
     end
 end
 
-(* Printer extension to remove \old(...) wrapper since TriCera is using
-   a different format. *)
-module SuppressOldAndPre (X : Printer.PrinterClass) = struct
-  class printer : Printer.extensible_printer = 
-    object (self)
-      inherit X.printer as super
 
-      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
-      method! term fmt (t : term) =
-        match t.term_node with
-        | Tat (inner, BuiltinLabel Old)
-        | Tat (inner, BuiltinLabel Pre) ->
-            (* Drop the wrapper and print the inner term only *)
-            self#term fmt inner
-        | _ ->
-            super#term fmt t
-    end
-end
 
 let is_old_or_pre_logic_label ll =
   match ll with
@@ -87,10 +137,7 @@ let logic_var_name lv =
     | Some(vi) -> vi.vname
     | None -> lv.lv_name
 
-let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
-  match lt with
-  | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
-  | _ -> lt
+
 
 
 type harness_func = {
@@ -816,7 +863,7 @@ class tricera_print out = object (self)
         | TConst(lc) ->
           self#print_using Printer.pp_logic_constant lc;
         | TLval(tl) ->
-          ignore (Cil.visitCilTermLval (self :> Cil.cilVisitor) tl);
+          self#print_using Printer.pp_term_lval tl;
         | TBinOp(bop, t1, t2) ->
           self#print_string "(";
           ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
