@@ -453,7 +453,7 @@ let make_harness_func fdec behavs =
     | TFun(r, _, _) -> r
     | _ -> fdec.svar.vtype (*shouldnt happen*)
   in
-  { name = "main"
+  { name = "main" (* FIX ME: Should use a proper harness function name *)
     (* name = Printf.sprintf "%s_harness" f_name; *)
   ; block = h_block
   ; assumes = assumes
@@ -473,6 +473,7 @@ let rel_to_string rel =
     | Req ->  "=="
     | Rneq -> "!="
 
+(* FIX ME: Should be removed now since we use Cil_printer for printing. *)
 (*Borrowed from Cil_printer.ml*)
 let binop_to_string binop =
   match binop with
@@ -790,7 +791,7 @@ class tricera_print out = object (self)
 
     Printer.set_printer old_printer;
 
-
+  (* FIX ME: Is this function really needed? *)
   method! vbehavior b =
     (* let pre_name = self#do_pre_cond b.b_requires in
     let post_name = self#do_post_cond b.b_post_cond in *)
@@ -886,104 +887,17 @@ class tricera_print out = object (self)
         self#print_string "<<<";
         Cil.SkipChildren
 
+  
+  (* FIX ME: Remove before final commit.
+      Only exists to check that these functions a no longer called.
+  *)
   method! vterm_node t =
     raise (Failure "vterm_node")
-(*
-  method! vterm_node tn =
-    let _ =
-      match tn with
-        | TConst(lc) ->
-          self#print_using Printer.pp_logic_constant lc;
-        | TLval(tl) ->
-          self#print_using Printer.pp_term_lval tl;
-        | TBinOp(bop, t1, t2) ->
-          self#print_string "(";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
-          self#print_string (Printf.sprintf " %s " (binop_to_string bop));
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
-          self#print_string ")";
-        | TUnOp(uop, t) ->
-          self#print_string "(";
-          self#print_string (unop_to_string uop);
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-          self#print_string ")";
-        | TDataCons(lci, terms) ->
-          self#print_string "logic_sum_types_not_supported"
-          (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
-        (* | TLogic_coerce (_, t) ->
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
-        | Tat(t, ll) ->
-          if is_old_or_pre_logic_label ll then
-            begin
-              self#print_wrapped_in_old
-                t.term_type
-                (fun () -> ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t));
-            end
-          else
-            begin
-              self#print_string "Currently only old/pre logic labels supported" ;
-            end
-        | Tif(c, t1, t2) ->
-          self#print_string "(";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) c);
-          self#print_string " ? ";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
-          self#print_string " : ";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
-          self#print_string ")";
-        | TCast(_, _, t) ->
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        | Tlet(b, t) ->
-          self#add_let_var_def b;
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        | _ ->
-          self#print_string "Unsupported term received";
-          term_node_debug_print out tn;
-    in
-    Cil.SkipChildren
-*)
 
   method! vterm_lval (tlh, toff) =
     raise (Failure "vterm_lval")
 
   method! vquantifiers q =
     raise (Failure "vterm_lval")
-(*
-Cases:
-  ptr to struct: to =
-*)
-(*
-  method! vterm_lval (tlh, toff) =
-    match tlh with
-      | TResult(typ) ->
-        let tlh'  = TVar(Cil_const.make_logic_var_kind (self#result_string curr_func_name) LVC (Ctype typ)) in
-        self#print_using Printer.pp_term_lval (tlh', toff);
-        Cil.SkipChildren
-      | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
-        self#print_wrapped_in_old
-                (Cil.typeOfTermLval  (tlh, toff))
-                (fun () -> self#print_using Printer.pp_term_lval (tlh, toff));
-        Cil.SkipChildren
-      | TMem(t) ->
-        self#print_using Printer.pp_term_lval (tlh, toff);
-        Cil.SkipChildren
-      | TVar(lv) ->
-          (Options_saida.Self.debug ~level:3 "looking up let var: %s" lv.lv_name);
-          match Logic_var.Hashtbl.find_opt let_var_defs lv with
-            | Some(l_body) ->
-              let _ = match l_body with
-                | LBterm(t) ->
-                  ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-                | LBpred(p) ->
-                  ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-                | _ -> ()
-              in
-              Cil.SkipChildren
-            | None ->
-              self#print_using Printer.pp_term_lval (tlh, toff);
-              Cil.SkipChildren
 
-  method! vquantifiers q =
-    Cil.SkipChildren
-*)
 end
