@@ -36,6 +36,53 @@ let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
   | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
   | _ -> lt
 
+(*Debugging function to check what type a Term is*)
+let term_node_debug_print out tn =
+    match tn with
+        | TConst(lc) -> Format.fprintf out "-1";
+        | TLval(tl) -> Format.fprintf out "0";
+        | TSizeOf(_) -> Format.fprintf out "1"(** size of a given C type. *)
+        | TSizeOfE (_) -> Format.fprintf out "2" (** size of the type of an expression. *)
+        | TSizeOfStr (_) -> Format.fprintf out "3" (** size of a string constant. *)
+        | TAlignOf (_) -> Format.fprintf out "4" (** alignment of a type. *)
+        | TAlignOfE (_) -> Format.fprintf out "5" (** alignment of the type of an expression. *)
+        | TUnOp (_, _) -> Format.fprintf out "6" (** unary operator. *)
+        | TBinOp (_, _, _) -> Format.fprintf out "7" (** binary operators. *)
+        | TCast (_,_, _) -> Format.fprintf out "8" (** cast to a C type. *)
+        | TAddrOf (_) -> Format.fprintf out "9" (** address of a term. *)
+        | TStartOf (_) -> Format.fprintf out "10" (** beginning of an array. *)
+
+        (* additional constructs *)
+        | Tapp (_, _, _) -> Format.fprintf out "11"
+        (** application of a logic function. *)
+        | Tlambda (_, _) -> Format.fprintf out "12" (** lambda abstraction. *)
+        | TDataCons (_, _) -> Format.fprintf out "13"
+        (** constructor of logic sum-type. *)
+        | Tif (_, _, _) -> Format.fprintf out "14"
+        (** conditional operator*)
+        | Tat (_, _) -> Format.fprintf out "15"
+        (** term refers to a particular program point. *)
+        | Tbase_addr (_, _) -> Format.fprintf out "16" (** base address of a pointer. *)
+        | Toffset (_, _) -> Format.fprintf out "17" (** offset from the base address of a pointer. *)
+        | Tblock_length (_, _) -> Format.fprintf out "18" (** length of the block pointed to by the term. *)
+        | Tnull -> Format.fprintf out "19"(** the null pointer. *)
+        (* | TLogic_coerce (lt, term) -> Format.fprintf out "19"; *)
+          (* logic_type_to_tla out lt *)
+        (** implicit conversion from a C type to a logic type.
+            The logic type must not be a Ctype. In particular, used to denote
+            lifting to Linteger and Lreal.
+        *)
+        | TUpdate (_, _, _) -> Format.fprintf out "21"
+        (** functional update of a field. *)
+        | Ttypeof (_) -> Format.fprintf out "22" (** type tag for a term. *)
+        | Ttype (_) -> Format.fprintf out "23" (** type tag for a C type. *)
+        | Tempty_set -> Format.fprintf out "24" (** the empty set. *)
+        | Tunion (_) -> Format.fprintf out "25" (** union of terms. *)
+        | Tinter (_) -> Format.fprintf out "26" (** intersection of terms. *)
+        | Tcomprehension (_, _, _) -> Format.fprintf out "27"
+        | Trange (_, _) -> Format.fprintf out "28" (** range of integers. *)
+        | Tlet (_,_) -> Format.fprintf out "29" (** local binding *)
+
 (* Printer extension to remove \old(...) wrapper since TriCera is using
    a different format. *)
 module SuppressOldAndPre (X : Printer.PrinterClass) = struct
@@ -84,44 +131,76 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
       method! quantifiers fmt (qfs : logic_var list) =
         ()
 
+      (*
+        FIX ME: Add context to printer to keep track of current function.
+          This is needed in order to generate the correct result variable
+          name.
+       *)
       val context_func_name = "CURRENT_FUNC_NAME"
       val mutable let_var_defs = Logic_var.Hashtbl.create 10
+
+      method private add_let_var_def b =
+        (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
+        Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
       method private result_string (fname : string) =
         fname ^ "_result";
 
       method private print_wrapped_in_old fmt ll (t : logic_type ) (f : Format.formatter -> unit -> unit) =
-        let old_printer = Printer.current_printer () in
-        Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
-        Format.fprintf fmt "$at(\"%a\", (%a)(%a))"
+        (* FIX ME: Remove "from Printer" in string before final commit. *)
+        Format.fprintf fmt "/* from Printer */ $at(\"%a\", (%a)(%a))"
             super#logic_label ll
             (self#typ None) (Logic_utils.logicCType (to_c_type t))
             f ();
-        Format.fprintf fmt "))";
-        Printer.set_printer old_printer;
 
       method! term_lval fmt (tlh, toff) =
         match tlh with
         | TResult(typ) ->
             let tlh' = TVar(Cil_const.make_logic_var_kind (self#result_string context_func_name) LVC (Ctype typ)) in
             super#term_lval fmt (tlh', toff);
-        | TMem({term_node = Tat(t,ll); _}) ->
-            self#print_wrapped_in_old fmt ll
-                  (Cil.typeOfTermLval  (tlh, toff))
-                  (fun fmt _ -> super#term_lval fmt (tlh, toff));
         | TMem(t) ->
           super#term_lval fmt (tlh, toff);
         | TVar(lv) ->
             (* first, check if it is a let-variable *)
-            (Options_saida.Self.debug ~level:3 "looking up let var: %s" lv.lv_name);
+            (Options_saida.Self.debug ~level:3 "printer looking up let var: %s" lv.lv_name);
             match Logic_var.Hashtbl.find_opt let_var_defs lv with
             | Some(l_body) ->
                (match l_body with
+               (* TODO: Currently expands body inplace. This is NOT the proper thing to do
+                    when e.g. \old(...) is involved. See e.g. let.c for an example where
+                    expansion leads to using an old value when a post value should be used.
+               *)
                 | LBterm(t) -> self#term  fmt t;
                 | LBpred(p) -> self#predicate fmt p;
                 | _ -> ()  (*Shouldnt happen*))
             | None ->
                 super#term_lval fmt (tlh, toff);
+
+      method! term_node fmt t =
+        match t.term_node with
+        | TConst _
+        | TLval _
+        | TBinOp _
+        | TUnOp _
+        | Tif _ 
+        | TCast _ ->
+          super#term_node fmt t
+        | TDataCons(lci, terms) ->
+          (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
+          Format.fprintf fmt "logic_sum_types_not_supported"
+     (* | TLogic_coerce (_, t) ->
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
+        | Tat(inner, ll) ->
+            self#print_wrapped_in_old fmt ll
+                  (inner.term_type)
+                  (fun fmt _ -> Printer.pp_term fmt inner);
+        | Tlet(def, body) ->
+          self#add_let_var_def def;
+          self#term fmt body;
+        | _ ->
+          Format.fprintf fmt "Unsupported term received";
+          term_node_debug_print fmt t.term_node;
+
     end
 end
 
@@ -462,56 +541,6 @@ let get_logic_var_decl_string lv =
   in
   Printf.sprintf "%s %s;" type_string lv.lv_name
 
-
-
-(*Debugging function to check what type a Term is*)
-let term_node_debug_print out tn =
-    match tn with
-        | TConst(lc) -> Format.fprintf out "-1";
-        | TLval(tl) -> Format.fprintf out "0";
-        | TSizeOf(_) -> Format.fprintf out "1"(** size of a given C type. *)
-        | TSizeOfE (_) -> Format.fprintf out "2" (** size of the type of an expression. *)
-        | TSizeOfStr (_) -> Format.fprintf out "3" (** size of a string constant. *)
-        | TAlignOf (_) -> Format.fprintf out "4" (** alignment of a type. *)
-        | TAlignOfE (_) -> Format.fprintf out "5" (** alignment of the type of an expression. *)
-        | TUnOp (_, _) -> Format.fprintf out "6" (** unary operator. *)
-        | TBinOp (_, _, _) -> Format.fprintf out "7" (** binary operators. *)
-        | TCast (_,_, _) -> Format.fprintf out "8" (** cast to a C type. *)
-        | TAddrOf (_) -> Format.fprintf out "9" (** address of a term. *)
-        | TStartOf (_) -> Format.fprintf out "10" (** beginning of an array. *)
-
-        (* additional constructs *)
-        | Tapp (_, _, _) -> Format.fprintf out "11"
-        (** application of a logic function. *)
-        | Tlambda (_, _) -> Format.fprintf out "12" (** lambda abstraction. *)
-        | TDataCons (_, _) -> Format.fprintf out "13"
-        (** constructor of logic sum-type. *)
-        | Tif (_, _, _) -> Format.fprintf out "14"
-        (** conditional operator*)
-        | Tat (_, _) -> Format.fprintf out "15"
-        (** term refers to a particular program point. *)
-        | Tbase_addr (_, _) -> Format.fprintf out "16" (** base address of a pointer. *)
-        | Toffset (_, _) -> Format.fprintf out "17" (** offset from the base address of a pointer. *)
-        | Tblock_length (_, _) -> Format.fprintf out "18" (** length of the block pointed to by the term. *)
-        | Tnull -> Format.fprintf out "19"(** the null pointer. *)
-        (* | TLogic_coerce (lt, term) -> Format.fprintf out "19"; *)
-          (* logic_type_to_tla out lt *)
-        (** implicit conversion from a C type to a logic type.
-            The logic type must not be a Ctype. In particular, used to denote
-            lifting to Linteger and Lreal.
-        *)
-        | TUpdate (_, _, _) -> Format.fprintf out "21"
-        (** functional update of a field. *)
-        | Ttypeof (_) -> Format.fprintf out "22" (** type tag for a term. *)
-        | Ttype (_) -> Format.fprintf out "23" (** type tag for a C type. *)
-        | Tempty_set -> Format.fprintf out "24" (** the empty set. *)
-        | Tunion (_) -> Format.fprintf out "25" (** union of terms. *)
-        | Tinter (_) -> Format.fprintf out "26" (** intersection of terms. *)
-        | Tcomprehension (_, _, _) -> Format.fprintf out "27"
-        | Trange (_, _) -> Format.fprintf out "28" (** range of integers. *)
-        | Tlet (_,_) -> Format.fprintf out "29" (** local binding *)
-
-
 let contains_ghost_var p =
    let lv_set = Cil.extract_free_logicvars_from_predicate p in
    let lv_list = Logic_var.Set.elements lv_set in
@@ -810,9 +839,9 @@ class tricera_print out = object (self)
       | Prel(rel, t1, t2) ->
         (
           self#print_string "(";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
+          self#print_using Printer.pp_term t1;
           self#print_string (Printf.sprintf " %s " (rel_to_string rel));
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
+          self#print_using Printer.pp_term t2;
           self#print_string ")";
           Cil.SkipChildren
         )
@@ -844,7 +873,7 @@ class tricera_print out = object (self)
         Cil.SkipChildren
       | Pif(t, p1, p2) ->
         self#print_string "(";
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        self#print_using Printer.pp_term t;
         self#print_string " ? ";
         ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
         self#print_string " : ";
@@ -857,6 +886,9 @@ class tricera_print out = object (self)
         self#print_string "<<<";
         Cil.SkipChildren
 
+  method! vterm_node t =
+    raise (Failure "vterm_node")
+(*
   method! vterm_node tn =
     let _ =
       match tn with
@@ -909,13 +941,18 @@ class tricera_print out = object (self)
           term_node_debug_print out tn;
     in
     Cil.SkipChildren
+*)
 
+  method! vterm_lval (tlh, toff) =
+    raise (Failure "vterm_lval")
 
+  method! vquantifiers q =
+    raise (Failure "vterm_lval")
 (*
 Cases:
   ptr to struct: to =
 *)
-
+(*
   method! vterm_lval (tlh, toff) =
     match tlh with
       | TResult(typ) ->
@@ -931,7 +968,6 @@ Cases:
         self#print_using Printer.pp_term_lval (tlh, toff);
         Cil.SkipChildren
       | TVar(lv) ->
-          (* first, check if it is a let-variable *)
           (Options_saida.Self.debug ~level:3 "looking up let var: %s" lv.lv_name);
           match Logic_var.Hashtbl.find_opt let_var_defs lv with
             | Some(l_body) ->
@@ -940,7 +976,7 @@ Cases:
                   ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
                 | LBpred(p) ->
                   ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-                | _ -> ()  (*Shouldnt happen*)
+                | _ -> ()
               in
               Cil.SkipChildren
             | None ->
@@ -949,4 +985,5 @@ Cases:
 
   method! vquantifiers q =
     Cil.SkipChildren
+*)
 end
