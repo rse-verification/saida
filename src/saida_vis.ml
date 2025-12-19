@@ -294,14 +294,12 @@ let logic_vars_from_pred pred =
   Logic_var.Set.union free_vars bounded_vars
 
 let logic_vars_from_id_pred_list id_pred_list =
-  List.fold_left
-    Logic_var.Set.union
-    Logic_var.Set.empty
-    (
-      List.map
-        (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
-        id_pred_list
-    )
+  id_pred_list
+  |> List.map
+      (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
+  |> List.fold_left
+      Logic_var.Set.union
+      Logic_var.Set.empty
 
 let make_harness_func fdec behavs =
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 
@@ -338,13 +336,6 @@ let make_harness_func fdec behavs =
   ; return_type = f_ret_type;
     (* ghost_vars_right_of_impl_in_post = []; *)
   }
-
-
-
-(*Enum describing if something belongs to pre- or post-condition*)
-type pre_or_post =
-  | PRE
-  | POST;;
 
 (*relation is of rel type*)
 let rel_to_string rel =
@@ -599,6 +590,7 @@ class tricera_print out = object (self)
 
 
   method add_let_var_def b =
+    (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
   method print_harness_fn_name hf =
@@ -893,6 +885,7 @@ Cases:
         Cil.SkipChildren
       | TVar(lv) ->
           (* first, check if it is a let-variable *)
+          (Options_saida.Self.debug ~level:3 "looking up let var: %s" lv.lv_name);
           match Logic_var.Hashtbl.find_opt let_var_defs lv with
             | Some(l_body) ->
               let _ = match l_body with

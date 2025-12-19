@@ -76,7 +76,7 @@ let rec modify_acsl_annots ic oc acsl_state line fn_list =
              | name ->
                (Self.debug ~level:3 "name:%s %s" name (Kernel.MainFunction.get ());
                if name = Kernel.MainFunction.get ()
-               then src_line
+               then src_line (*TODO: Add newline to this, since reading removes the newline*)
                else "/*@contract@*/\n" ^ src_line ^ "\n"))
         | (AcslOutside, AcslOutside) ->
             if (Str.string_match ghost_regex src_line 0) then
@@ -176,6 +176,7 @@ let run () =
     let pt = new tricera_print fmt in
     pt#do_fun_spec (List.hd(hf_list));
     let _ = Format.pp_print_flush fmt () in
+
     let output_fname = OutputFile.get () in
     match Kernel.Files.get () with
     | [] -> Self.result "Error, no source file found"
