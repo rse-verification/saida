@@ -19,7 +19,7 @@ jobs:
         os:
           - ubuntu-latest
         ocaml-compiler:
-          - "4.14.2"
+          - "4.14.1"
 
     runs-on: ${{ matrix.os }}
 
@@ -32,6 +32,7 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - run: |
+          sudo apt-get update
           opam --cli=2.1 install . --deps-only --with-test
           opam --cli=2.1 exec -- frama-c-ptests
           opam --cli=2.1 exec -- dune build @install
