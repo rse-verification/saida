@@ -32,6 +32,7 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - run: |
+          sudo apt-get update
           opam --cli=2.1 install . --deps-only --with-test
           opam --cli=2.1 exec -- frama-c-ptests
           opam --cli=2.1 exec -- dune build @install
