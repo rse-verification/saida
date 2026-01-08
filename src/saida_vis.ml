@@ -216,8 +216,10 @@ let logic_var_name lv =
     | Some(vi) -> vi.vname
     | None -> lv.lv_name
 
-
-
+type harness_block = {
+    mutable called_func: string;
+    mutable log_vars: logic_var list;
+}
 
 type harness_func = {
   mutable name: string;
@@ -229,10 +231,6 @@ type harness_func = {
   (* mutable ghost_vars_right_of_impl_in_post : logic_var list; *)
 }
 
-and harness_block = {
-    mutable called_func: string;
-    mutable log_vars: logic_var list;
-}
 
 let fst (a,b) = a
 let snd (a,b) = b
@@ -870,6 +868,11 @@ class tricera_print out = object (self)
         ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
         Cil.SkipChildren
       | Pvalid(ll, t) ->
+        (* FIX ME: The corresponding option to tricera is -valid-deref and
+            works on the complete program level. Hence, to translate this
+            we should remove the \valid predicate and add the -valid-deref
+            option to tricera.
+        *)
         Printer.pp_predicate_node out pn;
         Cil.SkipChildren
       | Pif(t, p1, p2) ->
