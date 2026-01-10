@@ -31,6 +31,77 @@ open Cil_datatype
 
 module IntSet = Set.Make(Int)
 
+let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
+  match lt with
+  | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
+  | _ -> lt
+
+(*Debugging function to check what type a Term is*)
+let term_node_debug_print out tn =
+    match tn with
+        | TConst(lc) -> Format.fprintf out "-1";
+        | TLval(tl) -> Format.fprintf out "0";
+        | TSizeOf(_) -> Format.fprintf out "1"(** size of a given C type. *)
+        | TSizeOfE (_) -> Format.fprintf out "2" (** size of the type of an expression. *)
+        | TSizeOfStr (_) -> Format.fprintf out "3" (** size of a string constant. *)
+        | TAlignOf (_) -> Format.fprintf out "4" (** alignment of a type. *)
+        | TAlignOfE (_) -> Format.fprintf out "5" (** alignment of the type of an expression. *)
+        | TUnOp (_, _) -> Format.fprintf out "6" (** unary operator. *)
+        | TBinOp (_, _, _) -> Format.fprintf out "7" (** binary operators. *)
+        | TCast (_,_, _) -> Format.fprintf out "8" (** cast to a C type. *)
+        | TAddrOf (_) -> Format.fprintf out "9" (** address of a term. *)
+        | TStartOf (_) -> Format.fprintf out "10" (** beginning of an array. *)
+
+        (* additional constructs *)
+        | Tapp (_, _, _) -> Format.fprintf out "11"
+        (** application of a logic function. *)
+        | Tlambda (_, _) -> Format.fprintf out "12" (** lambda abstraction. *)
+        | TDataCons (_, _) -> Format.fprintf out "13"
+        (** constructor of logic sum-type. *)
+        | Tif (_, _, _) -> Format.fprintf out "14"
+        (** conditional operator*)
+        | Tat (_, _) -> Format.fprintf out "15"
+        (** term refers to a particular program point. *)
+        | Tbase_addr (_, _) -> Format.fprintf out "16" (** base address of a pointer. *)
+        | Toffset (_, _) -> Format.fprintf out "17" (** offset from the base address of a pointer. *)
+        | Tblock_length (_, _) -> Format.fprintf out "18" (** length of the block pointed to by the term. *)
+        | Tnull -> Format.fprintf out "19"(** the null pointer. *)
+        (* | TLogic_coerce (lt, term) -> Format.fprintf out "19"; *)
+          (* logic_type_to_tla out lt *)
+        (** implicit conversion from a C type to a logic type.
+            The logic type must not be a Ctype. In particular, used to denote
+            lifting to Linteger and Lreal.
+        *)
+        | TUpdate (_, _, _) -> Format.fprintf out "21"
+        (** functional update of a field. *)
+        | Ttypeof (_) -> Format.fprintf out "22" (** type tag for a term. *)
+        | Ttype (_) -> Format.fprintf out "23" (** type tag for a C type. *)
+        | Tempty_set -> Format.fprintf out "24" (** the empty set. *)
+        | Tunion (_) -> Format.fprintf out "25" (** union of terms. *)
+        | Tinter (_) -> Format.fprintf out "26" (** intersection of terms. *)
+        | Tcomprehension (_, _, _) -> Format.fprintf out "27"
+        | Trange (_, _) -> Format.fprintf out "28" (** range of integers. *)
+        | Tlet (_,_) -> Format.fprintf out "29" (** local binding *)
+
+(* Printer extension to remove \old(...) wrapper since TriCera is using
+   a different format. *)
+module SuppressOldAndPre (X : Printer.PrinterClass) = struct
+  class printer : Printer.extensible_printer = 
+    object (self)
+      inherit X.printer as super
+
+      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
+      method! term fmt (t : term) =
+        match t.term_node with
+        | Tat (inner, BuiltinLabel Old)
+        | Tat (inner, BuiltinLabel Pre) ->
+            (* Drop the wrapper and print the inner term only *)
+            self#term fmt inner
+        | _ ->
+            super#term fmt t
+    end
+end
+
 (* Printer extension to adjust output for TriCera *)
 module HarnessPrinter (X : Printer.PrinterClass) = struct
   class printer : Printer.extensible_printer = 
@@ -55,27 +126,85 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
         match lv.lv_origin with
         | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
         | None -> super#logic_var fmt lv
-    end
-end
 
-(* Printer extension to remove \old(...) wrapper since TriCera is using
-   a different format. *)
-module SuppressOldAndPre (X : Printer.PrinterClass) = struct
-  class printer : Printer.extensible_printer = 
-    object (self)
-      inherit X.printer as super
+      (* ??? Supress quantifiers *)
+      method! quantifiers fmt (qfs : logic_var list) =
+        ()
 
-      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
-      method! term fmt (t : term) =
+      (*
+        FIX ME: Add context to printer to keep track of current function.
+          This is needed in order to generate the correct result variable
+          name.
+       *)
+      val context_func_name = "CURRENT_FUNC_NAME"
+      val mutable let_var_defs = Logic_var.Hashtbl.create 10
+
+      method private add_let_var_def b =
+        (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
+        Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
+
+      method private result_string (fname : string) =
+        fname ^ "_result";
+
+      method private print_wrapped_in_old fmt ll (t : logic_type ) (f : Format.formatter -> unit -> unit) =
+        (* FIX ME: Remove "from Printer" in string before final commit. *)
+        Format.fprintf fmt "/* from Printer */ $at(\"%a\", (%a)(%a))"
+            super#logic_label ll
+            (self#typ None) (Logic_utils.logicCType (to_c_type t))
+            f ();
+
+      method! term_lval fmt (tlh, toff) =
+        match tlh with
+        | TResult(typ) ->
+            let tlh' = TVar(Cil_const.make_logic_var_kind (self#result_string context_func_name) LVC (Ctype typ)) in
+            super#term_lval fmt (tlh', toff);
+        | TMem(t) ->
+          super#term_lval fmt (tlh, toff);
+        | TVar(lv) ->
+            (* first, check if it is a let-variable *)
+            (Options_saida.Self.debug ~level:3 "printer looking up let var: %s" lv.lv_name);
+            match Logic_var.Hashtbl.find_opt let_var_defs lv with
+            | Some(l_body) ->
+               (match l_body with
+               (* TODO: Currently expands body inplace. This is NOT the proper thing to do
+                    when e.g. \old(...) is involved. See e.g. let.c for an example where
+                    expansion leads to using an old value when a post value should be used.
+               *)
+                | LBterm(t) -> self#term  fmt t;
+                | LBpred(p) -> self#predicate fmt p;
+                | _ -> ()  (*Shouldnt happen*))
+            | None ->
+                super#term_lval fmt (tlh, toff);
+
+      method! term_node fmt t =
         match t.term_node with
-        | Tat (inner, BuiltinLabel Old)
-        | Tat (inner, BuiltinLabel Pre) ->
-            (* Drop the wrapper and print the inner term only *)
-            self#term fmt inner
+        | TConst _
+        | TLval _
+        | TBinOp _
+        | TUnOp _
+        | Tif _ 
+        | TCast _ ->
+          super#term_node fmt t
+        | TDataCons(lci, terms) ->
+          (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
+          Format.fprintf fmt "logic_sum_types_not_supported"
+     (* | TLogic_coerce (_, t) ->
+          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
+        | Tat(inner, ll) ->
+            self#print_wrapped_in_old fmt ll
+                  (inner.term_type)
+                  (fun fmt _ -> Printer.pp_term fmt inner);
+        | Tlet(def, body) ->
+          self#add_let_var_def def;
+          self#term fmt body;
         | _ ->
-            super#term fmt t
+          Format.fprintf fmt "Unsupported term received";
+          term_node_debug_print fmt t.term_node;
+
     end
 end
+
+
 
 let is_old_or_pre_logic_label ll =
   match ll with
@@ -87,10 +216,7 @@ let logic_var_name lv =
     | Some(vi) -> vi.vname
     | None -> lv.lv_name
 
-let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
-  match lt with
-  | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
-  | _ -> lt
+
 
 
 type harness_func = {
@@ -98,6 +224,7 @@ type harness_func = {
   mutable block: harness_block;
   mutable assumes: Cil_types.identified_predicate list;
   mutable asserts: Cil_types.identified_predicate list;
+  mutable params: Cil_types.varinfo list;
   mutable return_type: Cil_types.typ
   (* mutable ghost_vars_right_of_impl_in_post : logic_var list; *)
 }
@@ -293,83 +420,48 @@ let logic_vars_from_pred pred =
   Logic_var.Set.union free_vars bounded_vars
 
 let logic_vars_from_id_pred_list id_pred_list =
-  List.fold_left
-    Logic_var.Set.union
-    Logic_var.Set.empty
-    (
-      List.map
-        (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
-        id_pred_list
-    )
+  id_pred_list
+  |> List.map
+      (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
+  |> List.fold_left
+      Logic_var.Set.union
+      Logic_var.Set.empty
 
-let make_harness_func f_svar behavs =
+let make_harness_func fdec behavs =
+  let get_logic_vars (predicates: identified_predicate list): logic_var list = 
+    predicates
+    |> List.map (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
+    |> List.fold_left Logic_var.Set.union Logic_var.Set.empty
+    |> Logic_var.Set.elements
+    |> List.filter
+        (fun lv ->
+          match lv.lv_origin with
+          | Some(_) -> false
+          | None -> true
+        )
+  in
   (*TODO: Fix so that it can deal with different behaviors*)
   let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
   (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
   let asserts = List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs) in
   (*TODO: Extract vars only in \old-context instead*)
-  let vars_in_post =
-    List.fold_left
-      Logic_var.Set.union
-      Logic_var.Set.empty
-      (
-        List.map
-          (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
-          asserts
-      )
-  in
-  let vars_in_post_list = Logic_var.Set.elements vars_in_post in
-  let log_vars_in_post =
-    List.filter
-      (fun lv ->
-        match lv.lv_origin with
-          | Some(_) -> false
-          | None -> true
-      )
-      vars_in_post_list
-  in
-  let vars_in_pre =
-    List.fold_left
-      Logic_var.Set.union
-      Logic_var.Set.empty
-      (
-        List.map
-          (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
-          assumes
-      )
-  in
-  let vars_in_pre_list = Logic_var.Set.elements vars_in_pre in
-  let log_vars_in_pre =
-    List.filter
-      (fun lv ->
-        match lv.lv_origin with
-          | Some(_) -> false
-          | None -> true
-      )
-      vars_in_pre_list
-  in
+  let log_vars_in_post = get_logic_vars asserts in
+  let log_vars_in_pre = get_logic_vars assumes in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
-  let h_block = { called_func = f_svar.vname; log_vars = all_log_vars} in
-  let f_ret_type = match f_svar.vtype.tnode with
+  let h_block = { called_func = fdec.svar.vname; log_vars = all_log_vars} in
+  let f_ret_type = match fdec.svar.vtype.tnode with
     | TFun(r, _, _) -> r
-    | _ -> f_svar.vtype (*shouldnt happen*)
+    | _ -> fdec.svar.vtype (*shouldnt happen*)
   in
-  {
+  { name = "main" (* FIX ME: Should use a proper harness function name *)
     (* name = Printf.sprintf "%s_harness" f_name; *)
-    name = "main";
-    block = h_block;
-    assumes = assumes;
-    asserts = asserts;
-    return_type = f_ret_type;
+  ; block = h_block
+  ; assumes = assumes
+  ; asserts = asserts
+  ; params = fdec.sformals
+  ; return_type = f_ret_type;
     (* ghost_vars_right_of_impl_in_post = []; *)
   }
-
-
-
-(*Enum describing if something belongs to pre- or post-condition*)
-type pre_or_post =
-  | PRE
-  | POST;;
 
 (*relation is of rel type*)
 let rel_to_string rel =
@@ -381,6 +473,7 @@ let rel_to_string rel =
     | Req ->  "=="
     | Rneq -> "!="
 
+(* FIX ME: Should be removed now since we use Cil_printer for printing. *)
 (*Borrowed from Cil_printer.ml*)
 let binop_to_string binop =
   match binop with
@@ -449,56 +542,6 @@ let get_logic_var_decl_string lv =
   in
   Printf.sprintf "%s %s;" type_string lv.lv_name
 
-
-
-(*Debugging function to check what type a Term is*)
-let term_node_debug_print out tn =
-    match tn with
-        | TConst(lc) -> Format.fprintf out "-1";
-        | TLval(tl) -> Format.fprintf out "0";
-        | TSizeOf(_) -> Format.fprintf out "1"(** size of a given C type. *)
-        | TSizeOfE (_) -> Format.fprintf out "2" (** size of the type of an expression. *)
-        | TSizeOfStr (_) -> Format.fprintf out "3" (** size of a string constant. *)
-        | TAlignOf (_) -> Format.fprintf out "4" (** alignment of a type. *)
-        | TAlignOfE (_) -> Format.fprintf out "5" (** alignment of the type of an expression. *)
-        | TUnOp (_, _) -> Format.fprintf out "6" (** unary operator. *)
-        | TBinOp (_, _, _) -> Format.fprintf out "7" (** binary operators. *)
-        | TCast (_,_, _) -> Format.fprintf out "8" (** cast to a C type. *)
-        | TAddrOf (_) -> Format.fprintf out "9" (** address of a term. *)
-        | TStartOf (_) -> Format.fprintf out "10" (** beginning of an array. *)
-
-        (* additional constructs *)
-        | Tapp (_, _, _) -> Format.fprintf out "11"
-        (** application of a logic function. *)
-        | Tlambda (_, _) -> Format.fprintf out "12" (** lambda abstraction. *)
-        | TDataCons (_, _) -> Format.fprintf out "13"
-        (** constructor of logic sum-type. *)
-        | Tif (_, _, _) -> Format.fprintf out "14"
-        (** conditional operator*)
-        | Tat (_, _) -> Format.fprintf out "15"
-        (** term refers to a particular program point. *)
-        | Tbase_addr (_, _) -> Format.fprintf out "16" (** base address of a pointer. *)
-        | Toffset (_, _) -> Format.fprintf out "17" (** offset from the base address of a pointer. *)
-        | Tblock_length (_, _) -> Format.fprintf out "18" (** length of the block pointed to by the term. *)
-        | Tnull -> Format.fprintf out "19"(** the null pointer. *)
-        (* | TLogic_coerce (lt, term) -> Format.fprintf out "19"; *)
-          (* logic_type_to_tla out lt *)
-        (** implicit conversion from a C type to a logic type.
-            The logic type must not be a Ctype. In particular, used to denote
-            lifting to Linteger and Lreal.
-        *)
-        | TUpdate (_, _, _) -> Format.fprintf out "21"
-        (** functional update of a field. *)
-        | Ttypeof (_) -> Format.fprintf out "22" (** type tag for a term. *)
-        | Ttype (_) -> Format.fprintf out "23" (** type tag for a C type. *)
-        | Tempty_set -> Format.fprintf out "24" (** the empty set. *)
-        | Tunion (_) -> Format.fprintf out "25" (** union of terms. *)
-        | Tinter (_) -> Format.fprintf out "26" (** intersection of terms. *)
-        | Tcomprehension (_, _, _) -> Format.fprintf out "27"
-        | Trange (_, _) -> Format.fprintf out "28" (** range of integers. *)
-        | Tlet (_,_) -> Format.fprintf out "29" (** local binding *)
-
-
 let contains_ghost_var p =
    let lv_set = Cil.extract_free_logicvars_from_predicate p in
    let lv_list = Logic_var.Set.elements lv_set in
@@ -520,20 +563,68 @@ let get_ensures_with_ghost_right_of_impl ensures =
 
 module StringMap = Map.Make(String)
 
+type src_data = {
+  fundec_locations: (string * location) list;
+  harness_functions: harness_func list;
+}
 (*
   Class for pretty printing function contracts as harness function with
   assume and asserts in tricera style, inspired by Frama-C development guide:
     https://frama-c.com/download/frama-c-plugin-development-guide.pdf
 *)
-class acsl2tricera out = object (self)
+class acsl2tricera = object (self)
   inherit Visitor.frama_c_inplace as super
 
   val mutable curr_func = None
   val mutable indent = 0
-  val mutable global_c_vars = []
-  val mutable global_ghost_vars = []
 
   val mutable fn_list = [];
+  val mutable hf_list = [];
+
+  (*This is the main function intended to be called upon creation*)
+  method translate file =
+    let _ = Visitor.visitFramacFileSameGlobals
+              ((self) :> Visitor.frama_c_inplace)
+              (file)
+    in 
+    { fundec_locations = fn_list
+    ; harness_functions = hf_list
+    }
+
+  method! vfile f =
+    fn_list <- List.filter_map
+        (fun g ->
+          match g with
+            | GFun(f, loc) -> Some((f.svar.vorig_name, loc))
+            | _ -> None
+        )
+      f.globals;
+    Cil.DoChildren
+
+  method! vglob_aux g =
+    match g with
+      | GFun(f, _) ->
+        curr_func <- Some f;
+        Cil.DoChildren
+      | _ -> Cil.SkipChildren
+
+  method! vfunc f =
+    Cil.SkipChildren
+
+  (*Spec visited from here*)
+  method! vspec s =
+    if (List.length s.spec_behavior) > 0 then 
+      hf_list <- (make_harness_func (Option.get(curr_func)) s.spec_behavior)::hf_list;
+    Cil.SkipChildren
+end
+
+
+class tricera_print out = object (self)
+  inherit Visitor.frama_c_inplace as super
+
+  val mutable curr_func_name = "";
+
+  val mutable indent = 0
 
   val mutable deref_lvl = 0;
 
@@ -547,25 +638,7 @@ class acsl2tricera out = object (self)
   method incr_indent = indent <- indent + 1;
   method dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
 
-  (*This is the main function intended to be called upon creation*)
-  method translate =
-    let _ = Visitor.visitFramacFileSameGlobals
-              ((self) :> Visitor.frama_c_inplace)
-              (Ast.get ())
-    in fn_list
-
-
-  method get_curr_func_name =
-    match curr_func with
-      | Some f -> f.svar.vname
-      | None -> "FUNC_MISSING"
-
-  method get_curr_func_svar =
-    match curr_func with
-      | Some f -> f.svar
-      | None -> Cil.makeGlobalVar "FUNC_MISSING" Cil_const.voidType
-
-  method result_string = self#get_curr_func_name ^ "_result";
+  method result_string fname = fname ^ "_result";
 
   method print_indent =
   for _ = 1 to indent do
@@ -594,68 +667,11 @@ class acsl2tricera out = object (self)
 
 
   method add_let_var_def b =
+    (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
-
-  method! vfile f =
-    let global_vars =
-      List.filter_map
-        (
-          fun g ->
-            match g with
-              | GVar(vi, _, _) -> Some vi
-              | _ -> None
-        )
-        f.globals
-    in
-    (*Set global vars*)
-    global_c_vars <- List.filter (fun vi -> not vi.vghost) global_vars;
-    global_ghost_vars <- List.filter (fun vi -> vi.vghost) global_vars;
-    fn_list <- List.filter_map
-        (fun g ->
-          match g with
-            | GFun(f, loc) -> Some((f.svar.vorig_name, loc))
-            | _ -> None
-        )
-      f.globals;
-    Cil.DoChildren
-
-  method! vglob_aux g =
-    match g with
-      | GFun(f, _) ->
-        curr_func <- Some f;
-        Cil.DoChildren
-      | _ -> Cil.SkipChildren
-
-
-  method! vfunc f =
-    Cil.SkipChildren
-
-  (*Spec visited from here*)
-  method! vspec s =
-    let _ = if (List.length s.spec_behavior) > 0 then
-      begin
-        (* FIX ME: Currently prints a "main" function for each function 
-             in the source that has ACSL annotation. *)
-        let har_func = make_harness_func self#get_curr_func_svar s.spec_behavior in
-        self#do_fun_spec har_func;
-      end
-    in
-    Cil.SkipChildren
 
   method print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
-
-  (* Currently not used, global ghost variables are introduced in main.ml *)
-  method print_global_ghost_vars_decl =
-    if (List.length global_ghost_vars) > 0 then
-      self#print_line "//Declaring all global ghost vars";
-      (*Assumes that ghost vars have unique names (which they should have)*)
-    List.iter
-      (fun vi ->
-        self#print_string (get_var_decl_string vi);
-        self#print_newline;
-      )
-      global_ghost_vars;
 
   method print_require_assumes hf =
     if (List.length hf.assumes) > 0 then
@@ -704,14 +720,15 @@ class acsl2tricera out = object (self)
       (fun lv -> self#print_line (get_logic_var_decl_string lv))
       log_vars
 
-  method print_params_init =
-    match curr_func with
-      | Some(curr_func) when (List.length curr_func.sformals) > 0 ->
+  method print_params_init hf =
+    match hf.params with
+    | [] -> ()
+    | params ->
         self#print_line "//Declare the paramters of the function to be called";
-        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) curr_func.sformals;
-      | _ -> ();
+        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) params;
 
   method do_fun_spec hf =
+    curr_func_name <- hf.block.called_func;
     let old_printer = Printer.current_printer () in
     Printer.update_printer (module HarnessPrinter : Printer.PrinterExtension);
 
@@ -726,7 +743,7 @@ class acsl2tricera out = object (self)
         level we initialize the parameters for the function and
         send them as arguments to the inner harness function.
         the inner harness will contain all assumes and asserts. *)
-    self#print_params_init;
+    self#print_params_init hf;
     self#print_newline;
 
     (*Print the declaration of ghost-variables*)
@@ -750,25 +767,22 @@ class acsl2tricera out = object (self)
 
     (*Print the function call to the function we are harness for*)
     self#print_line "//Function call that the harness function verifies";
-    let _ =
-      match curr_func with
-        | Some(curr_func) ->
-          let params =
-            String.concat ", " (List.map (fun vi -> vi.vname) curr_func.sformals)
-          in
-          (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
-          (*Quick fix main2 for working in tricera*)
-          let s = match hf.return_type.tnode with
-            | TVoid -> ""
-            | _ -> (get_type_decl_string hf.return_type) ^ " " ^ self#result_string ^ " = "
-          in
-          let fname = curr_func.svar.vname in
-          if fname = "main" then
-            self#print_line (s ^ "main2("^ params ^");\n")
-          else
-            self#print_line (s ^ fname ^ "("^ params ^");\n");
-        | None -> ();
+
+    let params =
+      String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
     in
+    (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
+    (*Quick fix main2 for working in tricera*)
+    let s = match hf.return_type.tnode with
+      | TVoid -> ""
+      | _ -> (get_type_decl_string hf.return_type) ^ " " ^ (self#result_string hf.block.called_func) ^ " = "
+    in
+    let fname = hf.block.called_func in
+    if fname = "main" then
+      self#print_line (s ^ "main2("^ params ^");\n")
+    else
+      self#print_line (s ^ fname ^ "("^ params ^");\n");
+
     (*Print the asserts, from the post-cond*)
     self#print_ensure_asserts hf;
 
@@ -777,7 +791,7 @@ class acsl2tricera out = object (self)
 
     Printer.set_printer old_printer;
 
-
+  (* FIX ME: Is this function really needed? *)
   method! vbehavior b =
     (* let pre_name = self#do_pre_cond b.b_requires in
     let post_name = self#do_post_cond b.b_post_cond in *)
@@ -826,9 +840,9 @@ class acsl2tricera out = object (self)
       | Prel(rel, t1, t2) ->
         (
           self#print_string "(";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
+          self#print_using Printer.pp_term t1;
           self#print_string (Printf.sprintf " %s " (rel_to_string rel));
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
+          self#print_using Printer.pp_term t2;
           self#print_string ")";
           Cil.SkipChildren
         )
@@ -860,7 +874,7 @@ class acsl2tricera out = object (self)
         Cil.SkipChildren
       | Pif(t, p1, p2) ->
         self#print_string "(";
-        ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
+        self#print_using Printer.pp_term t;
         self#print_string " ? ";
         ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
         self#print_string " : ";
@@ -873,95 +887,17 @@ class acsl2tricera out = object (self)
         self#print_string "<<<";
         Cil.SkipChildren
 
-  method! vterm_node tn =
-    let _ =
-      match tn with
-        | TConst(lc) ->
-          self#print_using Printer.pp_logic_constant lc;
-        | TLval(tl) ->
-          ignore (Cil.visitCilTermLval (self :> Cil.cilVisitor) tl);
-        | TBinOp(bop, t1, t2) ->
-          self#print_string "(";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
-          self#print_string (Printf.sprintf " %s " (binop_to_string bop));
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
-          self#print_string ")";
-        | TUnOp(uop, t) ->
-          self#print_string "(";
-          self#print_string (unop_to_string uop);
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-          self#print_string ")";
-        | TDataCons(lci, terms) ->
-          self#print_string "logic_sum_types_not_supported"
-          (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
-        (* | TLogic_coerce (_, t) ->
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
-        | Tat(t, ll) ->
-          if is_old_or_pre_logic_label ll then
-            begin
-              self#print_wrapped_in_old
-                t.term_type
-                (fun () -> ignore (Cil.visitCilTerm (self :> Cil.cilVisitor) t));
-            end
-          else
-            begin
-              self#print_string "Currently only old/pre logic labels supported" ;
-            end
-        | Tif(c, t1, t2) ->
-          self#print_string "(";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) c);
-          self#print_string " ? ";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t1);
-          self#print_string " : ";
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t2);
-          self#print_string ")";
-        | TCast(_, _, t) ->
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        | Tlet(b, t) ->
-          self#add_let_var_def b;
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-        | _ ->
-          self#print_string "Unsupported term received";
-          term_node_debug_print out tn;
-    in
-    Cil.SkipChildren
-
-
-(*
-Cases:
-  ptr to struct: to =
-*)
+  
+  (* FIX ME: Remove before final commit.
+      Only exists to check that these functions a no longer called.
+  *)
+  method! vterm_node t =
+    raise (Failure "vterm_node")
 
   method! vterm_lval (tlh, toff) =
-    match tlh with
-      | TResult(typ) ->
-        let tlh'  = TVar(Cil_const.make_logic_var_kind self#result_string LVC (Ctype typ)) in
-        self#print_using Printer.pp_term_lval (tlh', toff);
-        Cil.SkipChildren
-      | TMem({term_node = Tat(t,ll); _}) when is_old_or_pre_logic_label ll ->
-        self#print_wrapped_in_old
-                (Cil.typeOfTermLval  (tlh, toff))
-                (fun () -> self#print_using Printer.pp_term_lval (tlh, toff));
-        Cil.SkipChildren
-      | TMem(t) ->
-        self#print_using Printer.pp_term_lval (tlh, toff);
-        Cil.SkipChildren
-      | TVar(lv) ->
-          (* first, check if it is a let-variable *)
-          match Logic_var.Hashtbl.find_opt let_var_defs lv with
-            | Some(l_body) ->
-              let _ = match l_body with
-                | LBterm(t) ->
-                  ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t);
-                | LBpred(p) ->
-                  ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
-                | _ -> ()  (*Shouldnt happen*)
-              in
-              Cil.SkipChildren
-            | None ->
-              self#print_using Printer.pp_term_lval (tlh, toff);
-              Cil.SkipChildren
+    raise (Failure "vterm_lval")
 
   method! vquantifiers q =
-    Cil.SkipChildren
+    raise (Failure "vterm_lval")
+
 end

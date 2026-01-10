@@ -3,12 +3,15 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \old terms are translated correctly.
+  This test makes sure that correct contracts are considered and/or discarded.
 */
-typedef int Integer;
-Integer g;
+int g;
 
-Integer add_one(Integer x) {
+/*@
+  requires -500 <= x <= 500;
+  ensures \result == x+1;
+*/
+int add_one(int x) {
   return x+1;
 }
 
