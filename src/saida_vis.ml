@@ -146,12 +146,14 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
       method private result_string (fname : string) =
         fname ^ "_result";
 
-      method private print_wrapped_in_old fmt ll (t : logic_type ) (f : Format.formatter -> unit -> unit) =
-        (* FIX ME: Remove "from Printer" in string before final commit. *)
-        Format.fprintf fmt "/* from Printer */ $at(\"%a\", (%a)(%a))"
-            super#logic_label ll
-            (self#typ None) (Logic_utils.logicCType (to_c_type t))
-            f ();
+      method private wrap_in_label : 'a. 
+        Format.formatter -> logic_label -> logic_type -> (Format.formatter -> 'a -> unit) -> 'a -> unit = 
+          fun fmt ll t f arg ->
+            (* FIX ME: Remove "from Printer" in string before final commit. *)
+            Format.fprintf fmt "/* from Printer */ $at(\"%a\", (%a)(%a))"
+                super#logic_label ll
+                (self#typ None) (Logic_utils.logicCType (to_c_type t))
+                f arg;
 
       method! term_lval fmt (tlh, toff) =
         match tlh with
@@ -191,9 +193,7 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
      (* | TLogic_coerce (_, t) ->
           ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
         | Tat(inner, ll) ->
-            self#print_wrapped_in_old fmt ll
-                  (inner.term_type)
-                  (fun fmt _ -> Printer.pp_term fmt inner);
+            self#wrap_in_label fmt ll (inner.term_type) self#term inner;
         | Tlet(def, body) ->
           self#add_let_var_def def;
           self#term fmt body;
@@ -201,6 +201,65 @@ module HarnessPrinter (X : Printer.PrinterClass) = struct
           Format.fprintf fmt "Unsupported term received";
           term_node_debug_print fmt t.term_node;
 
+
+
+      method private pred_bin_op fmt p1 p2 op_string =
+        Format.fprintf fmt "%a %s %a" self#predicate p1 op_string self#predicate p2;
+    
+      method! predicate_node fmt pn =
+        match pn with
+          | Ptrue ->
+            super#predicate_node fmt (Prel(Rneq, (Cil.lone ()), (Cil.lzero ())));
+          | Pfalse ->
+            super#predicate_node fmt (Prel(Rneq, (Cil.lzero ()), (Cil.lzero ())));
+          | Pnot(p) ->
+            super#predicate_node fmt pn;
+          | Pand(p1, p2) ->
+            super#predicate_node fmt pn;
+          | Por(p1, p2) ->
+            super#predicate_node fmt pn;
+          | Pxor(p1, p2)  ->
+            (*
+              NOTE, for non-booleans, frama-c automatically compares with 0,
+              e.g., 2 ^^ 2  becomes (2!=0 ^^ 2!=0) in frama-c normalization
+            *)
+            self#pred_bin_op fmt p1 p2 "!=";
+          | Pimplies(p1, p2) ->
+            (
+              let notp1 = Logic_const.pnot p1 in
+              let notp1_or_p2 =  Por(notp1, p2) in
+              super#predicate_node fmt notp1_or_p2;
+            )
+          | Piff(p1, p2) ->
+            self#pred_bin_op fmt p1 p2 "==";
+          | Prel(rel, t1, t2) ->
+            super#predicate_node fmt pn;
+          | Pat(inner, ll) ->
+            self#wrap_in_label fmt ll (Lboolean) self#predicate inner;
+          | Pforall(q, p) ->
+            super#predicate fmt p;
+          | Pexists(q, p) ->
+            (* TODO: Currently approximate with (p || !p) *)
+            let notp = Logic_const.pnot p in
+            let p_or_notp = Por(p, notp) in
+            self#predicate_node fmt p_or_notp;
+          | Plet(b, p) ->
+            self#add_let_var_def b;
+(*self#pred_prec_named (current_level,p)*)
+            self#predicate fmt p;
+          | Pvalid(ll, t) ->
+            (* FIX ME: The corresponding option to tricera is -valid-deref and
+                works on the complete program level. Hence, to translate this
+                we should remove the \valid predicate and add the -valid-deref
+                option to tricera.
+            *)
+            super#predicate_node fmt pn;
+          | Pif(t, p1, p2) ->
+            (Options_saida.Self.debug ~level:3 "Pif");
+            super#predicate_node fmt pn;
+          | _ ->
+            Format.fprintf fmt "unsupported predicate received >>> %a <<<"
+              super#predicate_node pn;
     end
 end
 
