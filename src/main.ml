@@ -174,7 +174,8 @@ let run () =
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
     let pt = new tricera_print fmt in
-    pt#do_fun_spec (List.hd(hf_list));
+    Kernel.Unicode.without_unicode 
+      (fun _ -> pt#do_fun_spec (List.hd(hf_list))) ();
     let _ = Format.pp_print_flush fmt () in
 
     let output_fname = OutputFile.get () in

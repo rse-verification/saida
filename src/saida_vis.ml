@@ -789,12 +789,7 @@ class tricera_print out = object (self)
 
     Printer.set_printer old_printer;
 
-  (* FIX ME: Is this function really needed? *)
-  method! vbehavior b =
-    (* let pre_name = self#do_pre_cond b.b_requires in
-    let post_name = self#do_post_cond b.b_post_cond in *)
-    Cil.SkipChildren
-
+  
   method pred_bin_op p1 p2 op_string =
     self#print_string "(";
     ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
@@ -804,44 +799,57 @@ class tricera_print out = object (self)
 
   method! vpredicate_node pn =
     match pn with
-      | Ptrue -> self#print_string "1";
+      | Ptrue ->
+        Printer.pp_predicate_node out (Prel(Rneq, (Cil.lone ()), (Cil.lzero ())));
         Cil.SkipChildren
-      | Pfalse -> self#print_string "0";
+      | Pfalse ->
+        Printer.pp_predicate_node out (Prel(Rneq, (Cil.lzero ()), (Cil.lzero ())));
         Cil.SkipChildren
-      | Pand(p1, p2) ->  self#pred_bin_op p1 p2 "&&";
+      | Pand(p1, p2) ->
+        self#print_using Printer.pp_predicate_node pn;
         Cil.SkipChildren
-      | Por(p1, p2) ->  self#pred_bin_op p1 p2 "||";
+      | Por(p1, p2) ->
+        self#print_using Printer.pp_predicate_node pn;
         Cil.SkipChildren
       | Pxor(p1, p2)  ->
         (*
           NOTE, for non-booleans, frama-c automatically compares with 0,
           e.g., 2 ^^ 2  becomes (2!=0 ^^ 2!=0) in frama-c normalization
         *)
-        let _ = self#pred_bin_op p1 p2 "!=" in
+        self#pred_bin_op p1 p2 "!=";
         Cil.SkipChildren
       | Pimplies(p1, p2) ->
         (
+          let notp1 = Logic_const.pnot p1 in
+          let notp1_or_p2 =  Por(notp1, p2) in
+(*
           self#print_string "!";
           self#print_string "(";
           ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
           self#print_string " && !";
           ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p2);
           self#print_string ")";
+*)
+          self#print_using Printer.pp_predicate_node notp1_or_p2;
           Cil.SkipChildren
         )
       | Piff(p1, p2) ->
         self#pred_bin_op p1 p2 "==";
         Cil.SkipChildren
       | Pnot(p) ->
-        self#print_string "!";
+        self#print_using Printer.pp_predicate_node pn;
         Cil.DoChildren
       | Prel(rel, t1, t2) ->
         (
+          (Options_saida.Self.debug ~level:3 "tricera_print %s" (rel_to_string rel));
+(*
           self#print_string "(";
           self#print_using Printer.pp_term t1;
           self#print_string (Printf.sprintf " %s " (rel_to_string rel));
           self#print_using Printer.pp_term t2;
           self#print_string ")";
+*)
+          self#print_using Printer.pp_predicate_node pn;
           Cil.SkipChildren
         )
       | Pat(p, ll) ->
@@ -855,17 +863,19 @@ class tricera_print out = object (self)
           in
           Cil.SkipChildren
       | Pforall(q, p) ->
-        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
+        (*self#pred_prec_named (current_level,p)*)
+        self#print_using Printer.pp_predicate p;
         Cil.SkipChildren
       | Pexists(q, p) ->
         (*Currently approximate with (p || !p)*)
         let notp = Logic_const.pnot p in
-        let p_or_notp = Logic_const.por (p, notp) in
-        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p_or_notp);
+        let p_or_notp = Por(p, notp) in
+        self#print_using Printer.pp_predicate_node p_or_notp;
         Cil.SkipChildren
       | Plet(b, p) ->
         self#add_let_var_def b;
-        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p);
+        (*self#pred_prec_named (current_level,p)*)
+        self#print_using Printer.pp_predicate p;
         Cil.SkipChildren
       | Pvalid(ll, t) ->
         (* FIX ME: The corresponding option to tricera is -valid-deref and
@@ -876,6 +886,8 @@ class tricera_print out = object (self)
         Printer.pp_predicate_node out pn;
         Cil.SkipChildren
       | Pif(t, p1, p2) ->
+        (Options_saida.Self.debug ~level:3 "Pif");
+(*
         self#print_string "(";
         self#print_using Printer.pp_term t;
         self#print_string " ? ";
@@ -883,6 +895,8 @@ class tricera_print out = object (self)
         self#print_string " : ";
         ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p2);
         self#print_string ")";
+*)
+        Printer.pp_predicate_node out pn;
         Cil.SkipChildren
       | _ ->
         self#print_string "unsupported predicate received >>>";
@@ -894,6 +908,9 @@ class tricera_print out = object (self)
   (* FIX ME: Remove before final commit.
       Only exists to check that these functions a no longer called.
   *)
+  method! vbehavior b =
+    raise (Failure "vbehavior")
+
   method! vterm_node t =
     raise (Failure "vterm_node")
 
