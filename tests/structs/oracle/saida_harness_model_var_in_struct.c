@@ -20,11 +20,11 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((s<TModel offset not supported: y> >= 0));
+  assume(s<TModel offset not supported: y> >= 0);
 
   //Function call that the harness function verifies
   int main_result = main2();
 
   //The ensures-clauses translated into asserts
-  assert((main_result == s.x));
+  assert(main_result == s.x);
 }

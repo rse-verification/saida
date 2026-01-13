@@ -17,7 +17,7 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((a == 'a'));
+  assume(a == 'a');
 
   //Function call that the harness function verifies
   int func_result = func(a);

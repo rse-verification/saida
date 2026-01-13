@@ -102,167 +102,178 @@ module SuppressOldAndPre (X : Printer.PrinterClass) = struct
     end
 end
 
-(* Printer extension to adjust output for TriCera *)
-module HarnessPrinter (X : Printer.PrinterClass) = struct
-  class printer : Printer.extensible_printer = 
-    object (self)
-      inherit X.printer as super
+module HarnessPrinter = struct
+  open Printer
 
-      (* Disallow TModel in offsets *)
-      method! term_offset fmt (toff : term_offset) =
-        match toff with
-        | TModel (mi, _) -> Format.fprintf fmt "<TModel offset not supported: %s>" mi.mi_name
-        | _ -> super#term_offset fmt toff
+  let with_print_cil_as_is f arg =
+    let module PrintAsIs = Kernel.PrintAsIs in
+    let old, default = PrintAsIs.get (), not (PrintAsIs.is_set ()) in
+    PrintAsIs.on ();
+    let r = f arg in
+    if default then PrintAsIs.clear () else PrintAsIs.set old;
+    r
 
-      (* Print 0 and 1 instead of \false and \true, since 0 and 1 is what is used by TriCera *)
-      method! logic_constant fmt (lc : logic_constant) =
-        match lc with
-        | Boolean(false) -> Format.fprintf fmt "%d" 0 (* TriCera does not support "false" yet. *)
-        | Boolean(true) -> Format.fprintf fmt "%d" 1 (* TriCera does not support "true" yet. *)
-        | _ -> super#logic_constant fmt lc
+  module type FunctionNameProvider = sig
+    val name : string
+  end
 
-      (* Print the C name of the variable if it exists, instead of the logic name *)
-      method! logic_var fmt (lv : logic_var) =
-        match lv.lv_origin with
-        | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
-        | None -> super#logic_var fmt lv
+  module Make(Name: FunctionNameProvider) : PrinterExtension
+    = functor (X: PrinterClass) -> struct
+    class printer : Printer.extensible_printer = 
+      object (self)
+        inherit X.printer as super
 
-      (* ??? Supress quantifiers *)
-      method! quantifiers fmt (qfs : logic_var list) =
-        ()
+        val context_func_name = Name.name
+        (*
+          FIX ME: \let variables should be local to each clause.
+            Currently they are kept for the whole function specification.
+         *)
+        val mutable let_var_defs = Logic_var.Hashtbl.create 10
+  
+        method private add_let_var_def b =
+          (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
+          Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
+  
+        (* Note: Must match whatever acsl2tricera is using *)
+        method private result_string (fname : string) =
+          fname ^ "_result";
+  
+        method private wrap_in_label : 'a. 
+          Format.formatter -> logic_label -> logic_type -> (Format.formatter -> 'a -> unit) -> 'a -> unit = 
+            fun fmt ll t f arg ->
+              Format.fprintf fmt "$at(\"%a\", (%a)(%a))"
+                  super#logic_label ll
+                  (self#typ None) (Logic_utils.logicCType (to_c_type t))
+                  f arg;
 
-      (*
-        FIX ME: Add context to printer to keep track of current function.
-          This is needed in order to generate the correct result variable
-          name.
-       *)
-      val context_func_name = "CURRENT_FUNC_NAME"
-      val mutable let_var_defs = Logic_var.Hashtbl.create 10
-
-      method private add_let_var_def b =
-        (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
-        Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
-
-      method private result_string (fname : string) =
-        fname ^ "_result";
-
-      method private wrap_in_label : 'a. 
-        Format.formatter -> logic_label -> logic_type -> (Format.formatter -> 'a -> unit) -> 'a -> unit = 
-          fun fmt ll t f arg ->
-            (* FIX ME: Remove "from Printer" in string before final commit. *)
-            Format.fprintf fmt "/* from Printer */ $at(\"%a\", (%a)(%a))"
-                super#logic_label ll
-                (self#typ None) (Logic_utils.logicCType (to_c_type t))
-                f arg;
-
-      method! term_lval fmt (tlh, toff) =
-        match tlh with
-        | TResult(typ) ->
-            let tlh' = TVar(Cil_const.make_logic_var_kind (self#result_string context_func_name) LVC (Ctype typ)) in
-            super#term_lval fmt (tlh', toff);
-        | TMem(t) ->
-          super#term_lval fmt (tlh, toff);
-        | TVar(lv) ->
-            (* first, check if it is a let-variable *)
-            (Options_saida.Self.debug ~level:3 "printer looking up let var: %s" lv.lv_name);
-            match Logic_var.Hashtbl.find_opt let_var_defs lv with
-            | Some(l_body) ->
-               (match l_body with
-               (* TODO: Currently expands body inplace. This is NOT the proper thing to do
-                    when e.g. \old(...) is involved. See e.g. let.c for an example where
-                    expansion leads to using an old value when a post value should be used.
-               *)
-                | LBterm(t) -> self#term  fmt t;
-                | LBpred(p) -> self#predicate fmt p;
-                | _ -> ()  (*Shouldnt happen*))
-            | None ->
-                super#term_lval fmt (tlh, toff);
-
-      method! term_node fmt t =
-        match t.term_node with
-        | TConst _
-        | TLval _
-        | TBinOp _
-        | TUnOp _
-        | Tif _ 
-        | TCast _ ->
-          super#term_node fmt t
-        | TDataCons(lci, terms) ->
-          (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
-          Format.fprintf fmt "logic_sum_types_not_supported"
-     (* | TLogic_coerce (_, t) ->
-          ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
-        | Tat(inner, ll) ->
-            self#wrap_in_label fmt ll (inner.term_type) self#term inner;
-        | Tlet(def, body) ->
-          self#add_let_var_def def;
-          self#term fmt body;
-        | _ ->
-          Format.fprintf fmt "Unsupported term received";
-          term_node_debug_print fmt t.term_node;
-
-
-
-      method private pred_bin_op fmt p1 p2 op_string =
-        Format.fprintf fmt "%a %s %a" self#predicate p1 op_string self#predicate p2;
+        (* Disallow TModel in offsets *)
+        method! term_offset fmt (toff : term_offset) =
+          match toff with
+          | TModel (mi, _) -> Format.fprintf fmt "<TModel offset not supported: %s>" mi.mi_name
+          | _ -> super#term_offset fmt toff
+  
+        (* Print 0 and 1 instead of \false and \true, since 0 and 1 is what is used by TriCera *)
+        method! logic_constant fmt (lc : logic_constant) =
+          match lc with
+          | Boolean(false) -> Format.fprintf fmt "%d" 0 (* TriCera does not support "false" yet. *)
+          | Boolean(true) -> Format.fprintf fmt "%d" 1 (* TriCera does not support "true" yet. *)
+          | _ -> super#logic_constant fmt lc
+  
+        (* Print the C name of the variable if it exists, instead of the logic name *)
+        method! logic_var fmt (lv : logic_var) =
+          match lv.lv_origin with
+          | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
+          | None -> super#logic_var fmt lv
+  
+        (* ??? Supress quantifiers *)
+        method! quantifiers fmt (qfs : logic_var list) =
+          ()
     
-      method! predicate_node fmt pn =
-        match pn with
-          | Ptrue ->
-            super#predicate_node fmt (Prel(Rneq, (Cil.lone ()), (Cil.lzero ())));
-          | Pfalse ->
-            super#predicate_node fmt (Prel(Rneq, (Cil.lzero ()), (Cil.lzero ())));
-          | Pnot(p) ->
-            super#predicate_node fmt pn;
-          | Pand(p1, p2) ->
-            super#predicate_node fmt pn;
-          | Por(p1, p2) ->
-            super#predicate_node fmt pn;
-          | Pxor(p1, p2)  ->
-            (*
-              NOTE, for non-booleans, frama-c automatically compares with 0,
-              e.g., 2 ^^ 2  becomes (2!=0 ^^ 2!=0) in frama-c normalization
-            *)
-            self#pred_bin_op fmt p1 p2 "!=";
-          | Pimplies(p1, p2) ->
-            (
-              let notp1 = Logic_const.pnot p1 in
-              let notp1_or_p2 =  Por(notp1, p2) in
-              super#predicate_node fmt notp1_or_p2;
-            )
-          | Piff(p1, p2) ->
-            self#pred_bin_op fmt p1 p2 "==";
-          | Prel(rel, t1, t2) ->
-            super#predicate_node fmt pn;
-          | Pat(inner, ll) ->
-            self#wrap_in_label fmt ll (Lboolean) self#predicate inner;
-          | Pforall(q, p) ->
-            super#predicate fmt p;
-          | Pexists(q, p) ->
-            (* TODO: Currently approximate with (p || !p) *)
-            let notp = Logic_const.pnot p in
-            let p_or_notp = Por(p, notp) in
-            self#predicate_node fmt p_or_notp;
-          | Plet(b, p) ->
-            self#add_let_var_def b;
-(*self#pred_prec_named (current_level,p)*)
-            self#predicate fmt p;
-          | Pvalid(ll, t) ->
-            (* FIX ME: The corresponding option to tricera is -valid-deref and
-                works on the complete program level. Hence, to translate this
-                we should remove the \valid predicate and add the -valid-deref
-                option to tricera.
-            *)
-            super#predicate_node fmt pn;
-          | Pif(t, p1, p2) ->
-            (Options_saida.Self.debug ~level:3 "Pif");
-            super#predicate_node fmt pn;
+        method! term_lval fmt (tlh, toff) =
+          match tlh with
+          | TResult(typ) ->
+              let tlh' = TVar(Cil_const.make_logic_var_kind (self#result_string context_func_name) LVC (Ctype typ)) in
+              super#term_lval fmt (tlh', toff);
+          | TMem(t) ->
+            super#term_lval fmt (tlh, toff);
+          | TVar(lv) ->
+              (* first, check if it is a let-variable *)
+              (Options_saida.Self.debug ~level:3 "printer looking up let var: %s" lv.lv_name);
+              match Logic_var.Hashtbl.find_opt let_var_defs lv with
+              | Some(l_body) ->
+                 (match l_body with
+                 (* TODO: Currently expands body inplace. This is NOT the proper thing to do
+                      when e.g. \old(...) is involved. See e.g. let.c for an example where
+                      expansion leads to using an old value when a post value should be used.
+                 *)
+                  | LBterm(t) -> self#term  fmt t;
+                  | LBpred(p) -> self#predicate fmt p;
+                  | _ -> ()  (*Shouldnt happen*))
+              | None ->
+                  super#term_lval fmt (tlh, toff);
+  
+        method! term_node fmt t =
+          match t.term_node with
+          | TConst _
+          | TLval _
+          | TBinOp _
+          | TUnOp _
+          | Tif _ 
+          | TCast _ ->
+            super#term_node fmt t
+          | TDataCons(lci, terms) ->
+            (* Format.fprintf out "%a" Printer.pp_logic_ctor_info lci; *)
+            Format.fprintf fmt "logic_sum_types_not_supported"
+       (* | TLogic_coerce (_, t) ->
+            ignore ( Cil.visitCilTerm (self :> Cil.cilVisitor) t); *)
+          | Tat(inner, ll) ->
+              self#wrap_in_label fmt ll (inner.term_type) self#term inner;
+          | Tlet(def, body) ->
+            self#add_let_var_def def;
+            self#term fmt body;
           | _ ->
-            Format.fprintf fmt "unsupported predicate received >>> %a <<<"
-              super#predicate_node pn;
-    end
+            Format.fprintf fmt "Unsupported term received";
+            term_node_debug_print fmt t.term_node;
+  
+        method private pred_bin_op fmt p1 p2 op_string =
+          Format.fprintf fmt "%a %s %a" self#predicate p1 op_string self#predicate p2;
+      
+        method! predicate_node fmt pn =
+          match pn with
+            | Ptrue ->
+              super#predicate_node fmt (Prel(Rneq, (Cil.lone ()), (Cil.lzero ())));
+            | Pfalse ->
+              super#predicate_node fmt (Prel(Rneq, (Cil.lzero ()), (Cil.lzero ())));
+            | Pnot(_)
+            | Pand(_)
+            | Por(_)
+            | Prel(_)
+            | Pif(_) ->
+              super#predicate_node fmt pn;
+            | Pxor(p1, p2)  ->
+              (*
+                NOTE, for non-booleans, frama-c automatically compares with 0,
+                e.g., 2 ^^ 2  becomes (2!=0 ^^ 2!=0) in frama-c normalization
+              *)
+              self#pred_bin_op fmt p1 p2 "!=";
+            | Pimplies(p1, p2) ->
+              (
+                let notp1 = Logic_const.pnot p1 in
+                let notp1_or_p2 =  Por(notp1, p2) in
+                super#predicate_node fmt notp1_or_p2;
+              )
+            | Piff(p1, p2) ->
+              self#pred_bin_op fmt p1 p2 "==";
+            | Pat(inner, ll) ->
+              let ltyp = Cil_types.Ctype Cil_const.intType in
+              self#wrap_in_label fmt ll (ltyp) self#predicate inner;
+            | Pforall(q, p) ->
+              super#predicate fmt p;
+            | Pexists(q, p) ->
+              (* 
+                 TODO: Currently approximate with (p || !p) which is plain wrong.
+                   Instead, use Bool expansion (Shannon decomposition)
+                   \exist q : p(q) <==> p[T/q] \/ p[F/q]
+              *)
+              let notp = Logic_const.pnot p in
+              let p_or_notp = Por(p, notp) in
+              self#predicate_node fmt p_or_notp;
+            | Plet(b, p) ->
+              self#add_let_var_def b;
+              self#predicate fmt p;
+            | Pvalid(ll, t) ->
+              (* FIX ME: The corresponding option to tricera is -valid-deref and
+                  works on the complete program level. Hence, to translate this
+                  we should remove the \valid predicate and add the -valid-deref
+                  option to tricera.
+              *)
+              super#predicate_node fmt pn;
+            | _ ->
+              Format.fprintf fmt "unsupported predicate received >>> %a <<<"
+                super#predicate_node pn;
+      end
+  end
 end
-
 
 
 let is_old_or_pre_logic_label ll =
@@ -293,7 +304,6 @@ type harness_func = {
 
 let fst (a,b) = a
 let snd (a,b) = b
-
 
 (* let find_default_behavior behavs =
   let default_behav_list = List.filter
@@ -677,8 +687,6 @@ end
 
 
 class tricera_print out = object (self)
-  inherit Visitor.frama_c_inplace as super
-
   val mutable curr_func_name = "";
 
   val mutable indent = 0
@@ -738,7 +746,7 @@ class tricera_print out = object (self)
         fun ip ->
           self#print_indent;
           self#print_string "assume(";
-          let _ = Cil.visitCilIdPredicate (self :> Cil.cilVisitor) ip in
+          let _ = Printer.pp_identified_predicate out ip in
           self#print_string ");\n";
       )
       hf.assumes;
@@ -751,7 +759,7 @@ class tricera_print out = object (self)
       (fun ip ->
         self#print_indent;
         self#print_string "assume(";
-        let _ = Cil.visitCilIdPredicate (self :> Cil.cilVisitor) ip in
+        let _ = Printer.pp_identified_predicate out ip in
         self#print_string ");\n";
       )
       ghost_special_list;
@@ -764,7 +772,7 @@ class tricera_print out = object (self)
         fun ip ->
           self#print_indent;
           self#print_string "assert(";
-          let _ = Cil.visitCilIdPredicate (self :> Cil.cilVisitor) ip in
+          let _ = Printer.pp_identified_predicate out ip in
           self#print_string ");\n";
       )
       hf.asserts;
@@ -784,11 +792,21 @@ class tricera_print out = object (self)
         self#print_line "//Declare the paramters of the function to be called";
         List.iter (fun vi -> self#print_line (get_var_decl_string vi)) params;
 
-  method do_fun_spec hf =
-    curr_func_name <- hf.block.called_func;
+  method do_fun_spec hf : unit =
     let old_printer = Printer.current_printer () in
-    Printer.update_printer (module HarnessPrinter : Printer.PrinterExtension);
+    let new_printer = (
+      module HarnessPrinter.Make(struct 
+        let name = hf.block.called_func
+      end) : Printer.PrinterExtension) in
 
+    Printer.update_printer (new_printer);
+    (self#print_fun_spec 
+    |> Kernel.Unicode.without_unicode
+    |> HarnessPrinter.with_print_cil_as_is
+    ) hf;
+    Printer.set_printer old_printer;
+
+  method private print_fun_spec hf =
     self#print_harness_fn_name hf;
     self#print_string "{\n";
     self#incr_indent;
@@ -845,128 +863,13 @@ class tricera_print out = object (self)
 
     self#dec_indent;
     self#print_string "}\n";
-
-    Printer.set_printer old_printer;
-
-  
-  method pred_bin_op p1 p2 op_string =
-    self#print_string "(";
-    ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
-    self#print_string (Printf.sprintf " %s " op_string);
-    ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p2);
-    self#print_string ")";
-
-  method! vpredicate_node pn =
-    match pn with
-      | Ptrue ->
-        Printer.pp_predicate_node out (Prel(Rneq, (Cil.lone ()), (Cil.lzero ())));
-        Cil.SkipChildren
-      | Pfalse ->
-        Printer.pp_predicate_node out (Prel(Rneq, (Cil.lzero ()), (Cil.lzero ())));
-        Cil.SkipChildren
-      | Pand(p1, p2) ->
-        self#print_using Printer.pp_predicate_node pn;
-        Cil.SkipChildren
-      | Por(p1, p2) ->
-        self#print_using Printer.pp_predicate_node pn;
-        Cil.SkipChildren
-      | Pxor(p1, p2)  ->
-        (*
-          NOTE, for non-booleans, frama-c automatically compares with 0,
-          e.g., 2 ^^ 2  becomes (2!=0 ^^ 2!=0) in frama-c normalization
-        *)
-        self#pred_bin_op p1 p2 "!=";
-        Cil.SkipChildren
-      | Pimplies(p1, p2) ->
-        (
-          let notp1 = Logic_const.pnot p1 in
-          let notp1_or_p2 =  Por(notp1, p2) in
-(*
-          self#print_string "!";
-          self#print_string "(";
-          ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
-          self#print_string " && !";
-          ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p2);
-          self#print_string ")";
-*)
-          self#print_using Printer.pp_predicate_node notp1_or_p2;
-          Cil.SkipChildren
-        )
-      | Piff(p1, p2) ->
-        self#pred_bin_op p1 p2 "==";
-        Cil.SkipChildren
-      | Pnot(p) ->
-        self#print_using Printer.pp_predicate_node pn;
-        Cil.DoChildren
-      | Prel(rel, t1, t2) ->
-        (
-          (Options_saida.Self.debug ~level:3 "tricera_print %s" (rel_to_string rel));
-(*
-          self#print_string "(";
-          self#print_using Printer.pp_term t1;
-          self#print_string (Printf.sprintf " %s " (rel_to_string rel));
-          self#print_using Printer.pp_term t2;
-          self#print_string ")";
-*)
-          self#print_using Printer.pp_predicate_node pn;
-          Cil.SkipChildren
-        )
-      | Pat(p, ll) ->
-          let _ = if is_old_or_pre_logic_label ll then
-            begin
-              self#print_wrapped_in_old (Cil_types.Ctype { tnode = Cil_types.TInt IChar; tattr = [] })
-                (fun () -> ignore (Cil.visitCilPredicate (self :> Cil.cilVisitor) p))
-            end
-          else
-            self#print_string "unsupported predicate label";
-          in
-          Cil.SkipChildren
-      | Pforall(q, p) ->
-        (*self#pred_prec_named (current_level,p)*)
-        self#print_using Printer.pp_predicate p;
-        Cil.SkipChildren
-      | Pexists(q, p) ->
-        (*Currently approximate with (p || !p)*)
-        let notp = Logic_const.pnot p in
-        let p_or_notp = Por(p, notp) in
-        self#print_using Printer.pp_predicate_node p_or_notp;
-        Cil.SkipChildren
-      | Plet(b, p) ->
-        self#add_let_var_def b;
-        (*self#pred_prec_named (current_level,p)*)
-        self#print_using Printer.pp_predicate p;
-        Cil.SkipChildren
-      | Pvalid(ll, t) ->
-        (* FIX ME: The corresponding option to tricera is -valid-deref and
-            works on the complete program level. Hence, to translate this
-            we should remove the \valid predicate and add the -valid-deref
-            option to tricera.
-        *)
-        Printer.pp_predicate_node out pn;
-        Cil.SkipChildren
-      | Pif(t, p1, p2) ->
-        (Options_saida.Self.debug ~level:3 "Pif");
-(*
-        self#print_string "(";
-        self#print_using Printer.pp_term t;
-        self#print_string " ? ";
-        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p1);
-        self#print_string " : ";
-        ignore ( Cil.visitCilPredicate (self :> Cil.cilVisitor) p2);
-        self#print_string ")";
-*)
-        Printer.pp_predicate_node out pn;
-        Cil.SkipChildren
-      | _ ->
-        self#print_string "unsupported predicate received >>>";
-        self#print_using Printer.pp_predicate_node pn;
-        self#print_string "<<<";
-        Cil.SkipChildren
-
   
   (* FIX ME: Remove before final commit.
       Only exists to check that these functions a no longer called.
-  *)
+
+  method! vpredicate_node pn =
+    raise (Failure "vpredicate_node")
+
   method! vbehavior b =
     raise (Failure "vbehavior")
 
@@ -978,5 +881,5 @@ class tricera_print out = object (self)
 
   method! vquantifiers q =
     raise (Failure "vterm_lval")
-
+  *)
 end

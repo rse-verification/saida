@@ -29,11 +29,11 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((s[1].x >= 0));
+  assume(s[1].x >= 0);
 
   //Function call that the harness function verifies
   int main_result = main2();
 
   //The ensures-clauses translated into asserts
-  assert((main_result == s[1].x));
+  assert(main_result == s[1].x);
 }

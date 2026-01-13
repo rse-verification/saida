@@ -173,6 +173,7 @@ let run () =
 
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
+    Format.pp_set_margin fmt max_int;
     let pt = new tricera_print fmt in
     Kernel.Unicode.without_unicode 
       (fun _ -> pt#do_fun_spec (List.hd(hf_list))) ();

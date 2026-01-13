@@ -4,17 +4,13 @@
    OPT: -lib-entry -main=func -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  Tests that nondeterministically initialized arrays are translated correctly.
- */
-int a[3];
+  Tests harness generation of implications.
+*/
 
-/*@contract@*/
-void increment(int x[], unsigned n) {
-  x[n] += 1;
-}
+int a;
 
 
-void func() {  increment(a, 1);
+int func() {  return (a > 0) ? a : 0;
 }
 void main()
 {
@@ -22,8 +18,8 @@ void main()
 
 
   //Function call that the harness function verifies
-  func();
+  int func_result = func();
 
   //The ensures-clauses translated into asserts
-  assert(a[1] == $at("Old", (int)(a[1])) + 1);
+  assert(!(a > 0) || func_result == a);
 }

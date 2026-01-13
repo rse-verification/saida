@@ -20,11 +20,11 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume((g_s.inner.x >= 0));
+  assume(g_s.inner.x >= 0);
 
   //Function call that the harness function verifies
   struct So start_result = start();
 
   //The ensures-clauses translated into asserts
-  assert((start_result.inner<TModel offset not supported: y> == g_s.inner<TModel offset not supported: y>));
+  assert(start_result.inner<TModel offset not supported: y> == g_s.inner<TModel offset not supported: y>);
 }

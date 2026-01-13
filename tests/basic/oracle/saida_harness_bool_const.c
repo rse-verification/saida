@@ -17,11 +17,11 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume(((a != 0) == 1));
+  assume((a != 0) == 1);
 
   //Function call that the harness function verifies
   int func_result = func(a);
 
   //The ensures-clauses translated into asserts
-  assert((func_result == $at("Old", (char)(a))));
+  assert(func_result == (int)$at("Old", (char)(a)));
 }

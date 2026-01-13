@@ -24,11 +24,11 @@ void main()
 
 
   //The requires-clauses translated into assumes
-  assume(((100 >= g) && (g >= 0)));
+  assume(100 >= g && g >= 0);
 
   //Function call that the harness function verifies
   main2();
 
   //The ensures-clauses translated into asserts
-  assert($at("Old", (char)((g >= 0))));
+  assert($at("Old", (int)(g >= 0)));
 }

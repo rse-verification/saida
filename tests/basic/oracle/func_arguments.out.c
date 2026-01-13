@@ -24,7 +24,7 @@ int f_with_arg(struct S *s) {
 
 /*@
   requires s->x >=0;
-  ensures \result == s->x ;
+  ensures \result == \old(s->x) ;
 */ 
 int start(struct S *s) {
   return f_with_arg(s);

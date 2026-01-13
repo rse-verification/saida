@@ -20,6 +20,7 @@
 (rule (target "multiple_contracts.err.oracle") (mode fallback) (action (write-file "multiple_contracts.err.oracle" "")))
 (rule (target "multiple_contracts.res.oracle") (mode fallback) (action (write-file "multiple_contracts.res.oracle" "")))
 (rule (target "multiple_contracts.out.c") (mode fallback) (action (write-file "multiple_contracts.out.c" "")))
+(rule (target "saida_harness_multiple_contracts.c") (mode fallback) (action (write-file "saida_harness_multiple_contracts.c" "")))
 (rule (target "bool_const.err.oracle") (mode fallback) (action (write-file "bool_const.err.oracle" "")))
 (rule (target "bool_const.res.oracle") (mode fallback) (action (write-file "bool_const.res.oracle" "")))
 (rule (target "bool_const.out.c") (mode fallback) (action (write-file "bool_const.out.c" "")))

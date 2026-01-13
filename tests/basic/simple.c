@@ -5,10 +5,9 @@
 /*
   This test makes sure that \old terms are translated correctly.
 */
-typedef int Integer;
-Integer g;
+int g;
 
-Integer add_one(Integer x) {
+int add_one(int x) {
   return x+1;
 }
 
