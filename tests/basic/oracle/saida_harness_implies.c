@@ -10,7 +10,8 @@
 int a;
 
 
-int func() {  return (a > 0) ? a : 0;
+int func() {
+  return (a > 0) ? a : 0;
 }
 void main()
 {

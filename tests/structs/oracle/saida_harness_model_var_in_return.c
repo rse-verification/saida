@@ -13,7 +13,8 @@ struct S {
   int x;
 };
 
-struct S start(void) {  return id(g_s);
+struct S start(void) {
+  return id(g_s);
 }
 void main()
 {

@@ -24,7 +24,8 @@ int f_with_arg(struct S *s) {
 }
 
 
-int start(struct S *s) {  return f_with_arg(s);
+int start(struct S *s) {
+  return f_with_arg(s);
 }
 void main()
 {

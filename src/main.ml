@@ -43,15 +43,15 @@ let line_to_fun_def fn_list n =
 let line_is_fun_def fn_list n =
   Option.is_some(line_to_fun_def fn_list n)
 
-(*in_acsl describes if inside multi-line acsl specification or not*)
-(*fn_list : [(name, loc)]contains a list of all function definitions and locations
-    where name is string and loc is Cil_types.location
-*)
 
+(* acslState describes if inside multi-line acsl specification or not*)
 type acslState = 
 | AcslOutside
 | AcslInside
 
+(*fn_list : [(name, loc)]contains a list of all function definitions and locations
+    where name is string and loc is Cil_types.location
+*)
 let rec modify_acsl_annots ic oc acsl_state line fn_list =
   let next_acsl_state cur_state str =
     match cur_state with
@@ -76,7 +76,7 @@ let rec modify_acsl_annots ic oc acsl_state line fn_list =
              | name ->
                (Self.debug ~level:3 "name:%s %s" name (Kernel.MainFunction.get ());
                if name = Kernel.MainFunction.get ()
-               then src_line (*TODO: Add newline to this, since reading removes the newline*)
+               then src_line ^ "\n"
                else "/*@contract@*/\n" ^ src_line ^ "\n"))
         | (AcslOutside, AcslOutside) ->
             if (Str.string_match ghost_regex src_line 0) then

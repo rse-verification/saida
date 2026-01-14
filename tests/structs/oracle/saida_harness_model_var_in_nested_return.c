@@ -14,7 +14,8 @@ struct Si {
   int x;
 };
 
-struct So start(void) {  return id(g_s);
+struct So start(void) {
+  return id(g_s);
 }
 void main()
 {

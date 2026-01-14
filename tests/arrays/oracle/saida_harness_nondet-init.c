@@ -14,7 +14,8 @@ void increment(int x[], unsigned n) {
 }
 
 
-void func() {  increment(a, 1);
+void func() {
+  increment(a, 1);
 }
 void main()
 {

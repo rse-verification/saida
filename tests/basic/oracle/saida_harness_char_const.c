@@ -8,7 +8,8 @@
 */
 
 
-int func(char a) {  return a;
+int func(char a) {
+  return a;
 }
 void main()
 {
