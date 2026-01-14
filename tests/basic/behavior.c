@@ -5,7 +5,8 @@
 */
 
 /*
-  Tests translation of behavior clauses. (Not supported yet.)
+  Tests translation of behavior clauses. 
+  TODO: Not supported yet.
 */
 
 int g_x;

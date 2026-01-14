@@ -175,8 +175,7 @@ let run () =
     let fmt = Format.formatter_of_buffer harness_buff in
     Format.pp_set_margin fmt max_int;
     let pt = new tricera_print fmt in
-    Kernel.Unicode.without_unicode 
-      (fun _ -> pt#do_fun_spec (List.hd(hf_list))) ();
+    pt#do_fun_spec (List.hd(hf_list));
     let _ = Format.pp_print_flush fmt () in
 
     let output_fname = OutputFile.get () in

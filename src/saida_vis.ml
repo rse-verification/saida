@@ -185,6 +185,8 @@ module HarnessPrinter = struct
                  (* TODO: Currently expands body inplace. This is NOT the proper thing to do
                       when e.g. \old(...) is involved. See e.g. let.c for an example where
                       expansion leads to using an old value when a post value should be used.
+                      See Example 2.31 in https://www.frama-c.com/download/acsl-1.22.pdf
+                      for an other illustration of the problem. 
                  *)
                   | LBterm(t) -> self#term  fmt t;
                   | LBpred(p) -> self#predicate fmt p;
@@ -530,48 +532,7 @@ let make_harness_func fdec behavs =
     (* ghost_vars_right_of_impl_in_post = []; *)
   }
 
-(*relation is of rel type*)
-let rel_to_string rel =
-  match rel with
-    | Rlt ->  "<"
-    | Rgt ->  ">"
-    | Rle ->  "<="
-    | Rge ->  ">="
-    | Req ->  "=="
-    | Rneq -> "!="
 
-(* FIX ME: Should be removed now since we use Cil_printer for printing. *)
-(*Borrowed from Cil_printer.ml*)
-let binop_to_string binop =
-  match binop with
-         | PlusA | PlusPI -> "+"
-         | MinusA | MinusPP | MinusPI -> "-"
-         | Mult -> "*"
-         | Div -> "/"
-         | Mod -> "%"
-         | Shiftlt -> "<<"
-         | Shiftrt -> ">>"
-         | Lt -> "<"
-         | Gt -> ">"
-         | Le -> "<="
-         | Ge -> ">="
-         | Eq -> "=="
-         | Ne -> "!="
-         | BAnd -> "&"
-         | BXor -> "^"
-         | BOr -> "|"
-         | LAnd -> "&&"
-         | LOr -> "||"
-
-let unop_to_string uop =
-   match uop with
-    | Neg -> "-"
-    | BNot -> "~"
-    | LNot -> "!"
-
-let rec repeat_str str n =
-  if n = 0 then ""
-  else str ^ (repeat_str str (n-1))
 
 let rec get_type_decl_string typ =
   match typ.tnode with
@@ -585,20 +546,7 @@ let get_var_decl_string vi =
   let type_string = get_type_decl_string vi.vtype in
   Printf.sprintf "%s %s;" type_string vi.vname
 
-(*special case where i first levels of derefs are not counted*)
-let rec get_type_decl_string_2 typ i =
-  match typ.tnode with
-    | TInt(_) -> "int"
-    | TComp(cinfo) -> Cil.compFullName cinfo
-    | TPtr(inner_type) ->
-      let s = if i > 0 then "" else " *" in
-      (get_type_decl_string_2 inner_type (i-1)) ^ s
-    | TNamed(tinfo) -> tinfo.torig_name
-    | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
 
-let get_var_decl_string_2 vi i =
-  let type_string = get_type_decl_string_2 vi.vtype i in
-  Printf.sprintf "%s %s;" type_string vi.vname
 
 let get_logic_var_decl_string lv =
   let type_string =
@@ -687,58 +635,36 @@ end
 
 
 class tricera_print out = object (self)
-  val mutable curr_func_name = "";
-
   val mutable indent = 0
-
-  val mutable deref_lvl = 0;
 
   val mutable let_var_defs = Logic_var.Hashtbl.create 10
 
-  method incr_deref_lvl = deref_lvl <- deref_lvl + 1;
-  method decr_deref_lvl = deref_lvl <- if deref_lvl <= 0 then 0 else deref_lvl - 1;
+  method private incr_indent = indent <- indent + 1;
+  method private dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
 
-  method get_deref_lvl = deref_lvl
+  method private result_string fname = fname ^ "_result";
 
-  method incr_indent = indent <- indent + 1;
-  method dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
-
-  method result_string fname = fname ^ "_result";
-
-  method print_indent =
+  method private print_indent =
   for _ = 1 to indent do
     self#print_string "  "
   done;
 
-  method print_string s = Format.fprintf out "%s%!" s
-  method print_line s =
+  method private print_string s = Format.fprintf out "%s%!" s
+
+  method private print_line s =
     self#print_indent;
     Format.fprintf out "%s%!\n" s;
 
-  method print_newline = Format.fprintf out "\n"
+  method private print_newline = Format.fprintf out "\n"
 
-  method print_using : 'a. (Format.formatter -> 'a -> unit) -> 'a -> unit =
-    fun pretty_printer value -> pretty_printer out value;
-
-  method print_wrapped_in_old (t : logic_type ) (f : unit -> unit) =
-    let old_printer = Printer.current_printer () in
-    Printer.update_printer (module SuppressOldAndPre : Printer.PrinterExtension);
-    self#print_string 
-      (Format.asprintf "$at(\"Old\", (%a)(" 
-        Printer.pp_typ (Logic_utils.logicCType (to_c_type t)));
-    f ();
-    self#print_string "))";
-    Printer.set_printer old_printer;
-
-
-  method add_let_var_def b =
+  method private add_let_var_def b =
     (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
     Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
-  method print_harness_fn_name hf =
+  method private print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
 
-  method print_require_assumes hf =
+  method private print_require_assumes hf =
     if (List.length hf.assumes) > 0 then
       self#print_line "//The requires-clauses translated into assumes";
     List.iter
@@ -751,7 +677,7 @@ class tricera_print out = object (self)
       )
       hf.assumes;
 
-  method print_special_ghost_ensure_assumes hf =
+  method private print_special_ghost_ensure_assumes hf =
     let ghost_special_list = get_ensures_with_ghost_right_of_impl hf.asserts in
     if (List.length ghost_special_list) > 0 then
       self#print_line "//Special assumes of ghost-variables 'assigned to' in requires clause";
@@ -764,7 +690,7 @@ class tricera_print out = object (self)
       )
       ghost_special_list;
 
-  method print_ensure_asserts hf =
+  method private print_ensure_asserts hf =
     if (List.length hf.asserts) > 0 then
       self#print_line "//The ensures-clauses translated into asserts";
     List.iter
@@ -777,7 +703,7 @@ class tricera_print out = object (self)
       )
       hf.asserts;
 
-  method print_log_var_decls hf =
+  method private print_log_var_decls hf =
     let log_vars = hf.block.log_vars in
     if (List.length log_vars > 0) then
       self#print_line "//printing logic var declarations, e.g. from \\forall or \\exists";
@@ -785,7 +711,7 @@ class tricera_print out = object (self)
       (fun lv -> self#print_line (get_logic_var_decl_string lv))
       log_vars
 
-  method print_params_init hf =
+  method private print_params_init hf =
     match hf.params with
     | [] -> ()
     | params ->
@@ -863,23 +789,4 @@ class tricera_print out = object (self)
 
     self#dec_indent;
     self#print_string "}\n";
-  
-  (* FIX ME: Remove before final commit.
-      Only exists to check that these functions a no longer called.
-
-  method! vpredicate_node pn =
-    raise (Failure "vpredicate_node")
-
-  method! vbehavior b =
-    raise (Failure "vbehavior")
-
-  method! vterm_node t =
-    raise (Failure "vterm_node")
-
-  method! vterm_lval (tlh, toff) =
-    raise (Failure "vterm_lval")
-
-  method! vquantifiers q =
-    raise (Failure "vterm_lval")
-  *)
-end
+  end

@@ -3,6 +3,7 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
 /*
+  TODO: Not supported yet.
   This test currently (2025-10-08) fails because \valid is not supported.
   The corresponding option to tricera is -valid-deref and works on the complete
   program level. Hence, to translate this we should remove the \valid predicate

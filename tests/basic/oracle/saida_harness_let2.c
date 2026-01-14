@@ -13,12 +13,22 @@ int *p = t;
 //@ ensures 0 <= \result <= 9;
 int any(void);
 
-/*@ 
-  assigns i;
-  assigns *(p+\at(i,Post));
-  ensures \let j = i+1; *(p+j-1) == *\old(p+j-1) + 1;
-@*/
+
+/*@contract@*/
 void f() {
   i = any();
   *(p+i) += 1;
+}
+void main()
+{
+
+  //printing logic var declarations, e.g. from \forall or \exists
+  int j;
+
+
+  //Function call that the harness function verifies
+  f();
+
+  //The ensures-clauses translated into asserts
+  assert(*((p + i + 1) - 1) == *$at("Old", (int *)((p + i + 1) - 1)) + 1);
 }

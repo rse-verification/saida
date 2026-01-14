@@ -1,3 +1,3 @@
-Syntax Error, trying to recover and continue parse... for input symbol "" spanning from unknown:29/36(699) to unknown:29/42(705)
+Syntax Error, trying to recover and continue parse... for input symbol "" spanning from unknown:30/36(726) to unknown:30/42(732)
 Warning: The input program could not be parsed. If 'main' is not the entry point to
 the program, use the option '-m:entry-function-name' to specify the entry point.

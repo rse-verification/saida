@@ -13,12 +13,22 @@ int t[10];
 //@ ensures 0 <= \result <= 9;
 int any(void);
 
-/*@ 
-  assigns i;
-  assigns t[\at(i,Post)];
-  ensures \let j = i; t[j] == \old(t[j]) + 1;
-@*/
+
+/*@contract@*/
 void f() {
   i = any();
   t[i]++;
+}
+void main()
+{
+
+  //printing logic var declarations, e.g. from \forall or \exists
+  int j;
+
+
+  //Function call that the harness function verifies
+  f();
+
+  //The ensures-clauses translated into asserts
+  assert(t[i] == $at("Old", (int)(t[i])) + 1);
 }
