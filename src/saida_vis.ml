@@ -29,8 +29,6 @@
 open Cil_types
 open Cil_datatype
 
-module IntSet = Set.Make(Int)
-
 let to_c_type (lt : Cil_types.logic_type) : Cil_types.logic_type =
   match lt with
   | Cil_types.Linteger -> Cil_types.Ctype (Cil.int32_t ())
@@ -83,28 +81,19 @@ let term_node_debug_print out tn =
         | Trange (_, _) -> Format.fprintf out "28" (** range of integers. *)
         | Tlet (_,_) -> Format.fprintf out "29" (** local binding *)
 
-(* Printer extension to remove \old(...) wrapper since TriCera is using
-   a different format. *)
-module SuppressOldAndPre (X : Printer.PrinterClass) = struct
-  class printer : Printer.extensible_printer = 
-    object (self)
-      inherit X.printer as super
 
-      (* Suppress the \old(...) / \at(..., \old|\pre) term wrapper. *)
-      method! term fmt (t : term) =
-        match t.term_node with
-        | Tat (inner, BuiltinLabel Old)
-        | Tat (inner, BuiltinLabel Pre) ->
-            (* Drop the wrapper and print the inner term only *)
-            self#term fmt inner
-        | _ ->
-            super#term fmt t
-    end
-end
-
+(* Printer extension to print pre/post conditions etc. in TriCera format. *)
 module HarnessPrinter = struct
   open Printer
 
+  (* 
+     Enable Kernel.PrintAsIs for a single function call. 
+
+     Among other things this will make sure expressions
+     like (0 < x) && (x < 10) are printed like that,
+     and not like 0 < x < 10 which is not valid in
+     TriCera.
+  *)
   let with_print_cil_as_is f arg =
     let module PrintAsIs = Kernel.PrintAsIs in
     let old, default = PrintAsIs.get (), not (PrintAsIs.is_set ()) in
@@ -117,6 +106,12 @@ module HarnessPrinter = struct
     val name : string
   end
 
+  (* 
+     Creates a HarnessPrinter for a specific function.
+     We need to inject the function name because we sometimes
+     need to give the result value of the function we are
+     creating a harness for a name based on the function name.
+  *)
   module Make(Name: FunctionNameProvider) : PrinterExtension
     = functor (X: PrinterClass) -> struct
     class printer : Printer.extensible_printer = 
@@ -165,7 +160,7 @@ module HarnessPrinter = struct
           | Some(vi) -> Format.fprintf fmt "%s" vi.vorig_name
           | None -> super#logic_var fmt lv
   
-        (* ??? Supress quantifiers *)
+        (* Supress quantifiers *)
         method! quantifiers fmt (qfs : logic_var list) =
           ()
     
@@ -253,7 +248,7 @@ module HarnessPrinter = struct
               super#predicate fmt p;
             | Pexists(q, p) ->
               (* 
-                 TODO: Currently approximate with (p || !p) which is plain wrong.
+                 FIX ME: Currently approximate with (p || !p) which is plain wrong!
                    Instead, use Bool expansion (Shannon decomposition)
                    \exist q : p(q) <==> p[T/q] \/ p[F/q]
               *)
@@ -278,15 +273,6 @@ module HarnessPrinter = struct
 end
 
 
-let is_old_or_pre_logic_label ll =
-  match ll with
-    | BuiltinLabel(Old) | BuiltinLabel(Pre) -> true
-    | _ -> false
-
-let logic_var_name lv =
-  match lv.lv_origin with
-    | Some(vi) -> vi.vname
-    | None -> lv.lv_name
 
 type harness_block = {
     mutable called_func: string;
@@ -421,7 +407,6 @@ and bounded_vars_term_offset offs =
           (bounded_vars_term t)
           (bounded_vars_term_offset o)
 
-
 and bounded_vars_predicate p = match p.pred_content with
   | Pfalse | Ptrue -> Logic_var.Set.empty
   | Papp (_,_,tl) ->
@@ -482,7 +467,6 @@ and bounded_vars_predicate p = match p.pred_content with
       List.fold_left
         (Fun.flip Logic_var.Set.add) (bounded_vars_predicate p) lvs
 
-
 let logic_vars_from_pred pred =
   let free_vars = Cil.extract_free_logicvars_from_predicate pred in
   let bounded_vars = bounded_vars_predicate pred in
@@ -495,6 +479,7 @@ let logic_vars_from_id_pred_list id_pred_list =
   |> List.fold_left
       Logic_var.Set.union
       Logic_var.Set.empty
+
 
 let make_harness_func fdec behavs =
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 
@@ -533,7 +518,6 @@ let make_harness_func fdec behavs =
   }
 
 
-
 let rec get_type_decl_string typ =
   match typ.tnode with
     | TInt(_) -> "int"
@@ -542,10 +526,10 @@ let rec get_type_decl_string typ =
     | TNamed(tinfo) -> tinfo.torig_name
     | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
 
+
 let get_var_decl_string vi =
   let type_string = get_type_decl_string vi.vtype in
   Printf.sprintf "%s %s;" type_string vi.vname
-
 
 
 let get_logic_var_decl_string lv =
@@ -556,6 +540,7 @@ let get_logic_var_decl_string lv =
       | _ -> "Unspported_type_of_logic_var"
   in
   Printf.sprintf "%s %s;" type_string lv.lv_name
+
 
 let contains_ghost_var p =
    let lv_set = Cil.extract_free_logicvars_from_predicate p in
@@ -576,7 +561,6 @@ let get_ensures_with_ghost_right_of_impl ensures =
     )
     ensures
 
-module StringMap = Map.Make(String)
 
 type src_data = {
   fundec_locations: (string * location) list;
