@@ -129,7 +129,7 @@ module HarnessPrinter = struct
           (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
           Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
   
-        (* Note: Must match whatever acsl2tricera is using *)
+        (* Note: Must match whatever tricera_print is using *)
         method private result_string (fname : string) =
           fname ^ "_result";
   
@@ -566,10 +566,12 @@ type src_data = {
   fundec_locations: (string * location) list;
   harness_functions: harness_func list;
 }
+
+
 (*
-  Class for pretty printing function contracts as harness function with
-  assume and asserts in tricera style, inspired by Frama-C development guide:
-    https://frama-c.com/download/frama-c-plugin-development-guide.pdf
+  Class for collecting information about function contracts.
+  Inspired by Frama-C development guide:
+  https://frama-c.com/download/frama-c-plugin-development-guide.pdf
 *)
 class acsl2tricera = object (self)
   inherit Visitor.frama_c_inplace as super
@@ -618,32 +620,32 @@ class acsl2tricera = object (self)
 end
 
 
+(*
+  Class for pretty printing function contracts as harness function with
+  assume and asserts in tricera style.
+  TODO: This should be turned into a module.
+*)
 class tricera_print out = object (self)
   val mutable indent = 0
-
-  val mutable let_var_defs = Logic_var.Hashtbl.create 10
 
   method private incr_indent = indent <- indent + 1;
   method private dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
 
-  method private result_string fname = fname ^ "_result";
-
+  (* TODO: Manual indentation should be replaced with
+       Format and pretty printing in boxes. *)
   method private print_indent =
   for _ = 1 to indent do
     self#print_string "  "
   done;
 
+  method private result_string fname = fname ^ "_result";
+
   method private print_string s = Format.fprintf out "%s%!" s
+  method private print_newline = Format.fprintf out "\n"
 
   method private print_line s =
     self#print_indent;
     Format.fprintf out "%s%!\n" s;
-
-  method private print_newline = Format.fprintf out "\n"
-
-  method private add_let_var_def b =
-    (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
-    Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
 
   method private print_harness_fn_name hf =
     self#print_line (Printf.sprintf "void %s()" hf.name);
@@ -702,20 +704,6 @@ class tricera_print out = object (self)
         self#print_line "//Declare the paramters of the function to be called";
         List.iter (fun vi -> self#print_line (get_var_decl_string vi)) params;
 
-  method do_fun_spec hf : unit =
-    let old_printer = Printer.current_printer () in
-    let new_printer = (
-      module HarnessPrinter.Make(struct 
-        let name = hf.block.called_func
-      end) : Printer.PrinterExtension) in
-
-    Printer.update_printer (new_printer);
-    (self#print_fun_spec 
-    |> Kernel.Unicode.without_unicode
-    |> HarnessPrinter.with_print_cil_as_is
-    ) hf;
-    Printer.set_printer old_printer;
-
   method private print_fun_spec hf =
     self#print_harness_fn_name hf;
     self#print_string "{\n";
@@ -730,12 +718,6 @@ class tricera_print out = object (self)
         the inner harness will contain all assumes and asserts. *)
     self#print_params_init hf;
     self#print_newline;
-
-    (*Print the declaration of ghost-variables*)
-    (*Since they are global, they have to be declared in global namespace,
-      handled later in main.ml, revoked this but keeping as a comment for potential future use*)
-    (* self#print_global_ghost_vars_decl;
-    self#print_newline; *)
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
     self#print_log_var_decls hf;
@@ -773,4 +755,22 @@ class tricera_print out = object (self)
 
     self#dec_indent;
     self#print_string "}\n";
-  end
+
+  (* 
+     Entry point. Responsible for setting up a suitable
+     Printer instance before printing the harness function.
+  *)
+  method do_fun_spec hf : unit =
+    let old_printer = Printer.current_printer () in
+    let new_printer = (
+      module HarnessPrinter.Make(struct 
+        let name = hf.block.called_func
+      end) : Printer.PrinterExtension) in
+
+    Printer.update_printer (new_printer);
+    (self#print_fun_spec 
+    |> Kernel.Unicode.without_unicode
+    |> HarnessPrinter.with_print_cil_as_is
+    ) hf;
+    Printer.set_printer old_printer;
+end

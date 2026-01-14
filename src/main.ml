@@ -104,22 +104,20 @@ let source_w_harness source_fname hbuff fn_list dest_fname =
 let rec add_inferred_to_source ic buff ht line fn_list =
   match (try_read ic) with
     | Some s ->
-      let _ =
-        (match line_to_fun_def fn_list line with
-          | Some(name, _) ->
-            (match Hashtbl.find_opt ht name with
-              | Some clist ->
-                List.iter (fun r -> Buffer.add_string buff (r ^ "\n")) clist;
-              | None ->
-                if (name <> (Kernel.MainFunction.get ())) then
-                  Buffer.add_string buff ("//No inferred contract found for " ^ name ^ "\n")
-                else ()
-            )
-          | None -> ()
-        )
-      in
-        let _ = Buffer.add_string buff (s ^ "\n") in
-        add_inferred_to_source ic buff ht (line+1) fn_list
+      (match line_to_fun_def fn_list line with
+        | Some(name, _) ->
+          (match Hashtbl.find_opt ht name with
+            | Some clist ->
+              List.iter (fun r -> Buffer.add_string buff (r ^ "\n")) clist;
+            | None ->
+              if (name <> (Kernel.MainFunction.get ())) then
+                Buffer.add_string buff ("//No inferred contract found for " ^ name ^ "\n")
+              else ()
+          )
+        | None -> ()
+      );
+      Buffer.add_string buff (s ^ "\n");
+      add_inferred_to_source ic buff ht (line+1) fn_list
     | None -> ()
 
 
