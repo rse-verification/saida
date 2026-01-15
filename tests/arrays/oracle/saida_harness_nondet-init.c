@@ -19,12 +19,13 @@ void func() {
 }
 void main()
 {
-
-
-
+  
+  
+  
   //Function call that the harness function verifies
   func();
-
+  
   //The ensures-clauses translated into asserts
   assert(a[1] == $at("Old", (int)(a[1])) + 1);
+  
 }

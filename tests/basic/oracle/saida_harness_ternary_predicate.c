@@ -16,12 +16,13 @@ int main2(void) {
 }
 void main()
 {
-
-
-
+  
+  
+  
   //Function call that the harness function verifies
   int main_result = main2();
-
+  
   //The ensures-clauses translated into asserts
   assert($at("Old", (int)(t)) >= 0xF0 ? 1 != 0 : 0 != 0);
+  
 }

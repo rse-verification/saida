@@ -31,14 +31,15 @@ void main()
 {
   //Declare the paramters of the function to be called
   struct S * s;
-
-
+  
+  
   //The requires-clauses translated into assumes
   assume(s->x >= 0);
-
+  
   //Function call that the harness function verifies
   int start_result = start(s);
-
+  
   //The ensures-clauses translated into asserts
   assert(start_result == $at("Old", (int)(s->x)));
+  
 }

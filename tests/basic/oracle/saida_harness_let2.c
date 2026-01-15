@@ -21,14 +21,15 @@ void f() {
 }
 void main()
 {
-
-  //printing logic var declarations, e.g. from \forall or \exists
+  
+  //Logic var declarations, e.g. from \forall or \exists
   int j;
-
-
+  
+  
   //Function call that the harness function verifies
   f();
-
+  
   //The ensures-clauses translated into asserts
   assert(*((p + i + 1) - 1) == *$at("Old", (int *)((p + i + 1) - 1)) + 1);
+  
 }

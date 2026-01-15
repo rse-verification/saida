@@ -679,6 +679,25 @@ class tricera_print out = object (self)
         Format.fprintf out "//Declare the paramters of the function to be called@,";
         List.iter (fun vi -> Format.fprintf out "%s@," (get_var_decl_string vi)) params
 
+  method private print_function_call hf =
+    Format.fprintf out "//Function call that the harness function verifies@,";
+    let params =
+      String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
+    in
+    (* Format.fprintf out "%s(%s);@," hf.block.called_func params; *)
+    (*Quick fix main2 for working in tricera*)
+    let s = match hf.return_type.tnode with
+      | TVoid -> ""
+      | _ ->
+        Format.asprintf "%s %s = "
+          (get_type_decl_string hf.return_type) (self#result_string hf.block.called_func)
+    in
+    let fname = hf.block.called_func in
+    if fname = "main" then
+      Format.fprintf out "%smain2(%s);@,@," s params
+    else
+      Format.fprintf out "%s%s(%s);@,@," s fname params
+      
   method private print_fun_spec hf =
     Format.fprintf out "@[<v>%a@,@[<v 2>{@," self#print_harness_fn_name hf;
 
@@ -706,22 +725,7 @@ class tricera_print out = object (self)
     self#print_newline; *)
 
     (*Print the function call to the function we are harness for*)
-    Format.fprintf out "//Function call that the harness function verifies@,";
-
-    let params =
-      String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
-    in
-    (* Format.fprintf out "%s(%s);@," hf.block.called_func params; *)
-    (*Quick fix main2 for working in tricera*)
-    let s = match hf.return_type.tnode with
-      | TVoid -> ""
-      | _ -> (get_type_decl_string hf.return_type) ^ " " ^ (self#result_string hf.block.called_func) ^ " = "
-    in
-    let fname = hf.block.called_func in
-    if fname = "main" then
-      Format.fprintf out "%smain2(%s);@,@," s params
-    else
-      Format.fprintf out "%s%s(%s);@,@," s fname params;
+    self#print_function_call hf;
 
     (*Print the asserts, from the post-cond*)
     self#print_ensure_asserts hf;
@@ -732,7 +736,7 @@ class tricera_print out = object (self)
      Entry point. Responsible for setting up a suitable
      Printer instance before printing the harness function.
   *)
-  method do_fun_spec hf : unit =
+  method print_harness_function hf : unit =
     let old_printer = Printer.current_printer () in
     let new_printer = (
       module HarnessPrinter.Make(struct 

@@ -21,14 +21,15 @@ void main2() {
 }
 void main()
 {
-
-
+  
+  
   //The requires-clauses translated into assumes
   assume(100 >= g && g >= 0);
-
+  
   //Function call that the harness function verifies
   main2();
-
+  
   //The ensures-clauses translated into asserts
   assert($at("Old", (int)(g >= 0)));
+  
 }

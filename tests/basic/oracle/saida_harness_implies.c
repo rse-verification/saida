@@ -15,12 +15,13 @@ int func() {
 }
 void main()
 {
-
-
-
+  
+  
+  
   //Function call that the harness function verifies
   int func_result = func();
-
+  
   //The ensures-clauses translated into asserts
   assert(!(a > 0) || func_result == a);
+  
 }

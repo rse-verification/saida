@@ -18,14 +18,15 @@ struct S start(void) {
 }
 void main()
 {
-
-
+  
+  
   //The requires-clauses translated into assumes
   assume(g_s<TModel offset not supported: y> >= 0);
-
+  
   //Function call that the harness function verifies
   struct S start_result = start();
-
+  
   //The ensures-clauses translated into asserts
   assert(start_result<TModel offset not supported: y> == g_s<TModel offset not supported: y>);
+  
 }
