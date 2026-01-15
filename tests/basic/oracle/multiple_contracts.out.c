@@ -1,12 +1,17 @@
 /* run.config
    LOG: @PTEST_NAME@.out.c
-   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
+   LOG: saida_harness_@PTEST_NAME@.c
+   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \old terms are translated correctly.
+  This test makes sure that correct contracts are considered and/or discarded.
 */
 int g;
 
+/*@
+  requires -500 <= x <= 500;
+  ensures \result == x+1;
+*/
 /*@
   requires g == x && 101 >= x && x >= 0;
   ensures \old(x) - \result == -1 && g - \result == -1 && \old(g) - \result == -1 && 102 >= \result && \result >= 1;

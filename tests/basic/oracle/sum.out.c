@@ -22,7 +22,5 @@ int sum(int n) {
   ensures g2 <= 15;
 */
 void main() {
-//  assume(0 <= g1 && g1 <= 5);
   g2 = sum(g1);
-//  assert(g2 <= 15);
 }

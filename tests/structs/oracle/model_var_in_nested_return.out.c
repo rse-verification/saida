@@ -4,6 +4,7 @@
    OPT: -lib-entry -main="start" -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
+  TODO: Not supported yet.
   Tests harness generation for nested structs containing model fields
   in the return value. This is not supported and should generate
   output indicating this.

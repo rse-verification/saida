@@ -3,7 +3,7 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This teset makes sure that \old terms are translated correctly.
+  This test makes sure that \old terms are translated correctly.
 */
 int g;
 

@@ -4,10 +4,10 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \old predicates are translated correctly.
- */
- 
+  This test makes sure that correct contracts are considered and/or discarded.
+*/
 int g;
+
 
 /*@contract@*/
 int add_one(int x) {
@@ -30,6 +30,6 @@ void main()
   main2();
   
   //The ensures-clauses translated into asserts
-  assert($at("Old", (int)(g >= 0)));
+  assert(g == $at("Old", (int)(g)) + 2);
   
 }

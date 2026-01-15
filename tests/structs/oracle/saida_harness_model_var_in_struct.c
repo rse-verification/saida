@@ -4,6 +4,7 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
+  TODO: Not supported yet.
   Tests harness generation for structs containing model fields.
   This is not supported and should generate output indicating this.
  */
@@ -17,14 +18,15 @@ int main2(void) {
 }
 void main()
 {
-
-
+  
+  
   //The requires-clauses translated into assumes
-  assume((s<TModel offset not supported: y> >= 0));
-
+  assume(s<TModel offset not supported: y> >= 0);
+  
   //Function call that the harness function verifies
   int main_result = main2();
-
+  
   //The ensures-clauses translated into asserts
-  assert((main_result == s.x));
+  assert(main_result == s.x);
+  
 }

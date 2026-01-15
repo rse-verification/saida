@@ -5,7 +5,8 @@
 */
 
 /*
-  Tests translation of behavior clauses. (Not supported yet.)
+  Tests translation of behavior clauses. 
+  TODO: Not supported yet.
 */
 
 int g_x;
@@ -37,14 +38,15 @@ int main2(void) {
 }
 void main()
 {
-
-
-
+  
+  
+  
   //Function call that the harness function verifies
   int main_result = main2();
-
+  
   //The ensures-clauses translated into asserts
-  assert((g_x == 0));
-  assert((g_x == ($at("Old", (int)(g_x)) + 1)));
-  assert((g_x == ($at("Old", (int)(g_x)) - 1)));
+  assert(g_x == 0);
+  assert(g_x == $at("Old", (int)(g_x)) + 1);
+  assert(g_x == $at("Old", (int)(g_x)) - 1);
+  
 }

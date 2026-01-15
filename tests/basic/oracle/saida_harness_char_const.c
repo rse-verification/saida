@@ -8,18 +8,20 @@
 */
 
 
-int func(char a) {  return a;
+int func(char a) {
+  return a;
 }
 void main()
 {
   //Declare the paramters of the function to be called
   int a;
-
-
+  
+  
   //The requires-clauses translated into assumes
-  assume((a == 'a'));
-
+  assume(a == 'a');
+  
   //Function call that the harness function verifies
   int func_result = func(a);
-
+  
+  
 }

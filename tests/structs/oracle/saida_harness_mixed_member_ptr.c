@@ -31,14 +31,15 @@ int main2(void) {
 }
 void main()
 {
-
-
+  
+  
   //The requires-clauses translated into assumes
-  assume(((s.inner)->x >= 0));
-
+  assume((s.inner)->x >= 0);
+  
   //Function call that the harness function verifies
   int main_result = main2();
-
+  
   //The ensures-clauses translated into asserts
-  assert((main_result == (s.inner)->x));
+  assert(main_result == (s.inner)->x);
+  
 }
