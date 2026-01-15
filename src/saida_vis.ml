@@ -626,88 +626,61 @@ end
   TODO: This should be turned into a module.
 *)
 class tricera_print out = object (self)
-  val mutable indent = 0
-
-  method private incr_indent = indent <- indent + 1;
-  method private dec_indent = indent <- if indent <= 0 then 0 else indent - 1;
-
-  (* TODO: Manual indentation should be replaced with
-       Format and pretty printing in boxes. *)
-  method private print_indent =
-  for _ = 1 to indent do
-    self#print_string "  "
-  done;
-
   method private result_string fname = fname ^ "_result";
 
-  method private print_string s = Format.fprintf out "%s%!" s
-  method private print_newline = Format.fprintf out "\n"
+  method private print_newline = Format.fprintf out "@,"
 
-  method private print_line s =
-    self#print_indent;
-    Format.fprintf out "%s%!\n" s;
-
-  method private print_harness_fn_name hf =
-    self#print_line (Printf.sprintf "void %s()" hf.name);
+  method private print_harness_fn_name fmt hf =
+    Format.fprintf fmt "void %s()" hf.name
 
   method private print_require_assumes hf =
-    if (List.length hf.assumes) > 0 then
-      self#print_line "//The requires-clauses translated into assumes";
-    List.iter
-      (
-        fun ip ->
-          self#print_indent;
-          self#print_string "assume(";
-          let _ = Printer.pp_identified_predicate out ip in
-          self#print_string ");\n";
-      )
-      hf.assumes;
+    match hf.assumes with
+    | [] -> ()
+    | assumes ->
+      Format.fprintf out "//The requires-clauses translated into assumes@,";
+      List.iter
+        (fun ip ->
+          Format.fprintf out "assume(%a);@," Printer.pp_identified_predicate ip)
+        assumes
 
   method private print_special_ghost_ensure_assumes hf =
-    let ghost_special_list = get_ensures_with_ghost_right_of_impl hf.asserts in
-    if (List.length ghost_special_list) > 0 then
-      self#print_line "//Special assumes of ghost-variables 'assigned to' in requires clause";
-    List.iter
-      (fun ip ->
-        self#print_indent;
-        self#print_string "assume(";
-        let _ = Printer.pp_identified_predicate out ip in
-        self#print_string ");\n";
-      )
-      ghost_special_list;
+    match get_ensures_with_ghost_right_of_impl hf.asserts with
+    | [] -> ()
+    | ghosts ->
+      Format.fprintf out "//Special assumes of ghost-variables 'assigned to' in requires clause@,";
+      List.iter
+        (fun ip ->
+          Format.fprintf out "assume(%a);@," Printer.pp_identified_predicate ip)
+        ghosts
 
   method private print_ensure_asserts hf =
-    if (List.length hf.asserts) > 0 then
-      self#print_line "//The ensures-clauses translated into asserts";
-    List.iter
-      (
-        fun ip ->
-          self#print_indent;
-          self#print_string "assert(";
-          let _ = Printer.pp_identified_predicate out ip in
-          self#print_string ");\n";
-      )
-      hf.asserts;
+    match hf.asserts with
+    | [] -> ()
+    | asserts ->
+      Format.fprintf out "//The ensures-clauses translated into asserts@,";
+      List.iter
+        (fun ip -> 
+          Format.fprintf out "assert(%a);@," Printer.pp_identified_predicate ip)
+        asserts
 
   method private print_log_var_decls hf =
-    let log_vars = hf.block.log_vars in
-    if (List.length log_vars > 0) then
-      self#print_line "//printing logic var declarations, e.g. from \\forall or \\exists";
-    List.iter
-      (fun lv -> self#print_line (get_logic_var_decl_string lv))
-      log_vars
+    match hf.block.log_vars with
+    | [] -> ()
+    | log_vars ->
+      Format.fprintf out "//Logic var declarations, e.g. from \\forall or \\exists@,";
+      List.iter
+        (fun lv -> Format.fprintf out "%s@," (get_logic_var_decl_string lv))
+        log_vars
 
   method private print_params_init hf =
     match hf.params with
     | [] -> ()
     | params ->
-        self#print_line "//Declare the paramters of the function to be called";
-        List.iter (fun vi -> self#print_line (get_var_decl_string vi)) params;
+        Format.fprintf out "//Declare the paramters of the function to be called@,";
+        List.iter (fun vi -> Format.fprintf out "%s@," (get_var_decl_string vi)) params
 
   method private print_fun_spec hf =
-    self#print_harness_fn_name hf;
-    self#print_string "{\n";
-    self#incr_indent;
+    Format.fprintf out "@[<v>%a@,@[<v 2>{@," self#print_harness_fn_name hf;
 
     (*Print the initialization of parameters (if any)*)
     (* FIX ME: Having parameters currently breaks the harness.
@@ -733,12 +706,12 @@ class tricera_print out = object (self)
     self#print_newline; *)
 
     (*Print the function call to the function we are harness for*)
-    self#print_line "//Function call that the harness function verifies";
+    Format.fprintf out "//Function call that the harness function verifies@,";
 
     let params =
       String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
     in
-    (* self#print_string (Printf.sprintf "%s(%s);\n" hf.block.called_func params); *)
+    (* Format.fprintf out "%s(%s);@," hf.block.called_func params; *)
     (*Quick fix main2 for working in tricera*)
     let s = match hf.return_type.tnode with
       | TVoid -> ""
@@ -746,15 +719,14 @@ class tricera_print out = object (self)
     in
     let fname = hf.block.called_func in
     if fname = "main" then
-      self#print_line (s ^ "main2("^ params ^");\n")
+      Format.fprintf out "%smain2(%s);@,@," s params
     else
-      self#print_line (s ^ fname ^ "("^ params ^");\n");
+      Format.fprintf out "%s%s(%s);@,@," s fname params;
 
     (*Print the asserts, from the post-cond*)
     self#print_ensure_asserts hf;
 
-    self#dec_indent;
-    self#print_string "}\n";
+    Format.fprintf out "@]@,}@,@]"
 
   (* 
      Entry point. Responsible for setting up a suitable
@@ -772,5 +744,5 @@ class tricera_print out = object (self)
     |> Kernel.Unicode.without_unicode
     |> HarnessPrinter.with_print_cil_as_is
     ) hf;
-    Printer.set_printer old_printer;
+    Printer.set_printer old_printer
 end
