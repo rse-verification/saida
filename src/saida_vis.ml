@@ -640,7 +640,8 @@ class tricera_print out = object (self)
       Format.fprintf out "//The requires-clauses translated into assumes@,";
       List.iter
         (fun ip ->
-          Format.fprintf out "assume(%a);@," Printer.pp_identified_predicate ip)
+          Format.fprintf out "assume(%a);@," 
+            Printer.pp_predicate_node ip.ip_content.tp_statement.pred_content)
         assumes
 
   method private print_special_ghost_ensure_assumes hf =
@@ -650,7 +651,8 @@ class tricera_print out = object (self)
       Format.fprintf out "//Special assumes of ghost-variables 'assigned to' in requires clause@,";
       List.iter
         (fun ip ->
-          Format.fprintf out "assume(%a);@," Printer.pp_identified_predicate ip)
+          Format.fprintf out "assume(%a);@,"
+            Printer.pp_predicate_node ip.ip_content.tp_statement.pred_content)
         ghosts
 
   method private print_ensure_asserts hf =
@@ -660,7 +662,8 @@ class tricera_print out = object (self)
       Format.fprintf out "//The ensures-clauses translated into asserts@,";
       List.iter
         (fun ip -> 
-          Format.fprintf out "assert(%a);@," Printer.pp_identified_predicate ip)
+          Format.fprintf out "assert(%a);@,"
+            Printer.pp_predicate_node ip.ip_content.tp_statement.pred_content)
         asserts
 
   method private print_log_var_decls hf =
