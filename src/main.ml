@@ -168,12 +168,16 @@ let run () =
     let { fundec_locations = fn_list
         ; harness_functions = hf_list
         } = a2t#translate (Ast.get ()) in
-
+    
+    let harness_func = 
+      List.find (fun i -> i.block.called_func == (Kernel.MainFunction.get_function_name ()))
+      hf_list
+    in
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
     Format.pp_set_margin fmt max_int;
     let pt = new tricera_print fmt in
-    pt#print_harness_function (List.find (fun i -> i.name == (Kernel.MainFunction.get_function_name ())) hf_list);
+    pt#print_harness harness_func;
     let _ = Format.pp_print_flush fmt () in
 
     let output_fname = OutputFile.get () in
@@ -190,6 +194,7 @@ let run () =
         ignore (run_tricera 
           (TriceraPath.get ())
           (Kernel.LibEntry.get ())
+          harness_func.name
           (TriceraOptions.get ())
           harness_fname result_fname);
         merge_source_w_inferred source_fname fn_list result_fname output_fname;
