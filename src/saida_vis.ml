@@ -508,8 +508,6 @@ let make_harness_func fdec behavs =
     | _ -> fdec.svar.vtype (*shouldnt happen*)
   in
   { name = fdec.svar.vorig_name
-    (* FIX ME: Should use a proper harness function name *)
-    (* name = Printf.sprintf "%s_harness" f_name; *)
   ; block = h_block
   ; assumes = assumes
   ; asserts = asserts
