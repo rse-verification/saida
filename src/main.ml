@@ -173,7 +173,7 @@ let run () =
     let fmt = Format.formatter_of_buffer harness_buff in
     Format.pp_set_margin fmt max_int;
     let pt = new tricera_print fmt in
-    pt#print_harness_function (List.hd(hf_list));
+    pt#print_harness_function (List.find (fun i -> i.name == (Kernel.MainFunction.get_function_name ())) hf_list);
     let _ = Format.pp_print_flush fmt () in
 
     let output_fname = OutputFile.get () in
