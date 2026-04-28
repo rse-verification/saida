@@ -1,9 +1,10 @@
 /* run.config
    LOG: saida_harness_@PTEST_NAME@.c
-   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
+   OPT: -lib-entry -main=f -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \let clauses are translated properly. 
+  This test makes sure that \let clauses are translated properly.
+  See example 2.31 in "ANSI/ISO C Specification Language  Version 1.22"
   TODO: Not yet supported.
 */
 
@@ -14,7 +15,6 @@ int t[10];
 int any(void);
 
 
-/*@contract@*/
 void f() {
   i = any();
   t[i]++;
