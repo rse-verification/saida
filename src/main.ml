@@ -71,13 +71,8 @@ let rec modify_acsl_annots ic oc acsl_state line fn_list =
         | (AcslOutside, AcslInside) -> ""
         | (AcslOutside, AcslOutside) when line_is_fun_def fn_list line ->
             (match get_fn_name s' with
-             | name when name = "main" ->
-               (Str.replace_first (Str.regexp "main") "main2" src_line) ^ "\n"
-             | name ->
-               (Self.debug ~level:3 "name:%s %s" name (Kernel.MainFunction.get ());
-               if name = Kernel.MainFunction.get ()
-               then src_line ^ "\n"
-               else "/*@contract@*/\n" ^ src_line ^ "\n"))
+             | name when name = Kernel.MainFunction.get () -> src_line ^ "\n"
+             | name -> "/*@contract@*/\n" ^ src_line ^ "\n")
         | (AcslOutside, AcslOutside) ->
             if (Str.string_match ghost_regex src_line 0) then
               (* Obvioulsy this will only work for single line comments. 
@@ -168,12 +163,16 @@ let run () =
     let { fundec_locations = fn_list
         ; harness_functions = hf_list
         } = a2t#translate (Ast.get ()) in
-
+    
+    let harness_func = 
+      List.find (fun i -> i.block.called_func == (Kernel.MainFunction.get_function_name ()))
+      hf_list
+    in
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
     Format.pp_set_margin fmt max_int;
     let pt = new tricera_print fmt in
-    pt#print_harness_function (List.find (fun i -> i.name == (Kernel.MainFunction.get_function_name ())) hf_list);
+    pt#print_harness harness_func;
     let _ = Format.pp_print_flush fmt () in
 
     let output_fname = OutputFile.get () in
@@ -190,6 +189,7 @@ let run () =
         ignore (run_tricera 
           (TriceraPath.get ())
           (Kernel.LibEntry.get ())
+          harness_func.name
           (TriceraOptions.get ())
           harness_fname result_fname);
         merge_source_w_inferred source_fname fn_list result_fname output_fname;

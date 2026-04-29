@@ -27,11 +27,8 @@ int f_with_arg(struct S *s) {
 int start(struct S *s) {
   return f_with_arg(s);
 }
-void main()
+int saida_harness_start_inner(struct S * s)
 {
-  //Declare the paramters of the function to be called
-  struct S * s;
-  
   
   //The requires-clauses translated into assumes
   assume(s->x >= 0);
@@ -41,5 +38,15 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(start_result == $at("Old", (int)(s->x)));
+  
+}
+void saida_harness_start()
+{
+  //Declare the paramters of the function to be called
+  struct S * s;
+  
+  //Call inner harness function
+  saida_harness_start_inner(s);
+  
   
 }

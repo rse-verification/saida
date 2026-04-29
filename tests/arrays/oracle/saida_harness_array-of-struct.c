@@ -21,20 +21,27 @@ int select_1_x(struct S structs[]) {
 }
 
 
-int main2(void) {
+int main(void) {
   return select_1_x(s);
 }
-void main()
+int saida_harness_main_inner()
 {
-  
   
   //The requires-clauses translated into assumes
   assume(s[1].x >= 0);
   
   //Function call that the harness function verifies
-  int main_result = main2();
+  int main_result = main();
   
   //The ensures-clauses translated into asserts
   assert(main_result == s[1].x);
+  
+}
+void saida_harness_main()
+{
+  
+  //Call inner harness function
+  saida_harness_main_inner();
+  
   
 }

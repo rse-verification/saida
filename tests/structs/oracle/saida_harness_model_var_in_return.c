@@ -16,9 +16,8 @@ struct S {
 struct S start(void) {
   return id(g_s);
 }
-void main()
+struct S saida_harness_start_inner()
 {
-  
   
   //The requires-clauses translated into assumes
   assume(g_s<TModel offset not supported: y> >= 0);
@@ -28,5 +27,13 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(start_result<TModel offset not supported: y> == g_s<TModel offset not supported: y>);
+  
+}
+void saida_harness_start()
+{
+  
+  //Call inner harness function
+  saida_harness_start_inner();
+  
   
 }

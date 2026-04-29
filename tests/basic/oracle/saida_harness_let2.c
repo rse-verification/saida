@@ -18,9 +18,8 @@ void f() {
   i = any();
   *(p+i) += 1;
 }
-void main()
+void saida_harness_f_inner()
 {
-  
   //Logic var declarations, e.g. from \forall or \exists
   int j;
   
@@ -30,5 +29,13 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(*((p + i + 1) - 1) == *$at("Old", (int *)((p + i + 1) - 1)) + 1);
+  
+}
+void saida_harness_f()
+{
+  
+  //Call inner harness function
+  saida_harness_f_inner();
+  
   
 }

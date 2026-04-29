@@ -498,16 +498,16 @@ let make_harness_func fdec behavs =
   let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
   (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
   let asserts = List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs) in
-  (*TODO: Extract vars only in \old-context instead*)
+  (*TODO: Extract vars only in \old-context instead? *)
   let log_vars_in_post = get_logic_vars asserts in
   let log_vars_in_pre = get_logic_vars assumes in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
-  let h_block = { called_func = fdec.svar.vname; log_vars = all_log_vars} in
+  let h_block = { called_func = fdec.svar.vorig_name; log_vars = all_log_vars} in
   let f_ret_type = match fdec.svar.vtype.tnode with
     | TFun(r, _, _) -> r
     | _ -> fdec.svar.vtype (*shouldnt happen*)
   in
-  { name = fdec.svar.vorig_name
+  { name = Format.sprintf "saida_harness_%s" fdec.svar.vorig_name
   ; block = h_block
   ; assumes = assumes
   ; asserts = asserts
@@ -517,18 +517,13 @@ let make_harness_func fdec behavs =
   }
 
 
-let rec get_type_decl_string typ =
-  match typ.tnode with
-    | TInt(_) -> "int"
-    | TComp(cinfo) -> Cil.compFullName cinfo
-    | TPtr(inner_type) -> (get_type_decl_string inner_type) ^ " *"
-    | TNamed(tinfo) -> tinfo.torig_name
-    | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
+let get_type_decl_string typ =
+  Format.asprintf "%a" Printer.pp_typ typ
 
 
 let get_var_decl_string vi =
   let type_string = get_type_decl_string vi.vtype in
-  Printf.sprintf "%s %s;" type_string vi.vname
+  Printf.sprintf "%s %s" type_string vi.vname
 
 
 let get_logic_var_decl_string lv =
@@ -538,7 +533,7 @@ let get_logic_var_decl_string lv =
       | Linteger -> "int"
       | _ -> "Unspported_type_of_logic_var"
   in
-  Printf.sprintf "%s %s;" type_string lv.lv_name
+  Printf.sprintf "%s %s" type_string lv.lv_name
 
 
 let contains_ghost_var p =
@@ -629,15 +624,6 @@ class tricera_print out = object (self)
 
   method private print_newline = Format.fprintf out "@,"
 
-  method private print_harness_fn_name fmt hf =
-    (*
-       TODO: Should probably use some more intelligent name. 
-         Fix this when fixing implementing function argument support.
-         See tests/basic/func_arguments.c
-    *)
-    (* Format.fprintf fmt "void %s()" *)
-    Format.fprintf fmt "void main()"
-
   method private print_require_assumes hf =
     match hf.assumes with
     | [] -> ()
@@ -677,7 +663,7 @@ class tricera_print out = object (self)
     | log_vars ->
       Format.fprintf out "//Logic var declarations, e.g. from \\forall or \\exists@,";
       List.iter
-        (fun lv -> Format.fprintf out "%s@," (get_logic_var_decl_string lv))
+        (fun lv -> Format.fprintf out "%s;@," (get_logic_var_decl_string lv))
         log_vars
 
   method private print_params_init hf =
@@ -685,39 +671,41 @@ class tricera_print out = object (self)
     | [] -> ()
     | params ->
         Format.fprintf out "//Declare the paramters of the function to be called@,";
-        List.iter (fun vi -> Format.fprintf out "%s@," (get_var_decl_string vi)) params
+        List.iter (fun vi -> Format.fprintf out "%s;@," (get_var_decl_string vi)) params
 
   method private print_function_call hf =
     Format.fprintf out "//Function call that the harness function verifies@,";
-    let params =
-      String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
-    in
-    (* Format.fprintf out "%s(%s);@," hf.block.called_func params; *)
-    (*Quick fix main2 for working in tricera*)
-    let s = match hf.return_type.tnode with
+    let params = String.concat ", " (List.map (fun vi -> vi.vname) hf.params) in
+    let result = match hf.return_type.tnode with
       | TVoid -> ""
       | _ ->
         Format.asprintf "%s %s = "
           (get_type_decl_string hf.return_type) (self#result_string hf.block.called_func)
     in
-    let fname = hf.block.called_func in
-    if fname = "main" then
-      Format.fprintf out "%smain2(%s);@,@," s params
-    else
-      Format.fprintf out "%s%s(%s);@,@," s fname params
-      
-  method private print_fun_spec hf =
-    Format.fprintf out "@[<v>%a@,@[<v 2>{@," self#print_harness_fn_name hf;
+    Format.fprintf out "%s%s(%s);@,@," result hf.block.called_func params
 
-    (*Print the initialization of parameters (if any)*)
-    (* FIX ME: Having parameters currently breaks the harness.
-        The problem is that the "old" state does not exist for
-        these. We need a two level harness for this. In the outer
-        level we initialize the parameters for the function and
-        send them as arguments to the inner harness function.
-        the inner harness will contain all assumes and asserts. *)
-    self#print_params_init hf;
-    self#print_newline;
+  method private inner_harness_name hf = 
+    hf.name ^ "_inner"
+
+  method private print_inner_harness_call hf =
+    Format.fprintf out "//Call inner harness function@,";
+    let params = String.concat ", " (List.map (fun vi -> vi.vname) hf.params) in
+    Format.fprintf out "%s(%s);@,@," (self#inner_harness_name hf) params
+
+  method private print_decl fmt vars =
+    match vars with
+    | [] -> ()
+    | head::[] ->
+        Format.fprintf fmt "%s" (get_var_decl_string head)
+    | head::tail -> 
+        Format.fprintf fmt "%s," (get_var_decl_string head);
+        self#print_decl fmt tail
+    
+  method private print_inner_harness hf =
+    Format.fprintf out "@[<v>%s %s(%a)@,@[<v 2>{@," 
+      (get_type_decl_string hf.return_type)
+      (self#inner_harness_name hf)
+      self#print_decl hf.params;
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
     self#print_log_var_decls hf;
@@ -738,13 +726,26 @@ class tricera_print out = object (self)
     (*Print the asserts, from the post-cond*)
     self#print_ensure_asserts hf;
 
-    Format.fprintf out "@]@,}@,@]"
+    Format.fprintf out "@]@,}@,@]" 
+    
+  method private print_outer_harness hf =
+    Format.fprintf out "@[<v>%s %s()@,@[<v 2>{@," "void" hf.name;
+
+    self#print_params_init hf;
+    self#print_newline;
+    self#print_inner_harness_call hf;
+
+    Format.fprintf out "@]@,}@,@]" 
+
+  method private print_harness_functions hf =
+    self#print_inner_harness hf;
+    self#print_outer_harness hf
 
   (* 
      Entry point. Responsible for setting up a suitable
      Printer instance before printing the harness function.
   *)
-  method print_harness_function hf : unit =
+  method print_harness hf : unit =
     let old_printer = Printer.current_printer () in
     let new_printer = (
       module HarnessPrinter.Make(struct 
@@ -752,7 +753,7 @@ class tricera_print out = object (self)
       end) : Printer.PrinterExtension) in
 
     Printer.update_printer (new_printer);
-    (self#print_fun_spec 
+    (self#print_harness_functions 
     |> Kernel.Unicode.without_unicode
     |> HarnessPrinter.with_print_cil_as_is
     ) hf;

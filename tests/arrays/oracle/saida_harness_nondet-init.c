@@ -17,9 +17,8 @@ void increment(int x[], unsigned n) {
 void func() {
   increment(a, 1);
 }
-void main()
+void saida_harness_func_inner()
 {
-  
   
   
   //Function call that the harness function verifies
@@ -27,5 +26,13 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(a[1] == $at("Old", (int)(a[1])) + 1);
+  
+}
+void saida_harness_func()
+{
+  
+  //Call inner harness function
+  saida_harness_func_inner();
+  
   
 }

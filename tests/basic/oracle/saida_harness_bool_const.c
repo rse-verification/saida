@@ -11,11 +11,8 @@
 int func(char a) {
   return a;
 }
-void main()
+int saida_harness_func_inner(char a)
 {
-  //Declare the paramters of the function to be called
-  int a;
-  
   
   //The requires-clauses translated into assumes
   assume((a != 0) == 1);
@@ -25,5 +22,15 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(func_result == (int)$at("Old", (char)(a)));
+  
+}
+void saida_harness_func()
+{
+  //Declare the paramters of the function to be called
+  char a;
+  
+  //Call inner harness function
+  saida_harness_func_inner(a);
+  
   
 }

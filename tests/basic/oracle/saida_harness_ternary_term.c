@@ -11,18 +11,25 @@
 int t;
 
 
-int main2(void) {
+int main(void) {
     return 0;
 }
-void main()
+int saida_harness_main_inner()
 {
   
   
-  
   //Function call that the harness function verifies
-  int main_result = main2();
+  int main_result = main();
   
   //The ensures-clauses translated into asserts
   assert((($at("Old", (int)(t)) >= 0xF0 ? 1 : 0) != 0) == 1);
+  
+}
+void saida_harness_main()
+{
+  
+  //Call inner harness function
+  saida_harness_main_inner();
+  
   
 }
