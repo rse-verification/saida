@@ -56,6 +56,10 @@ Step 5: (optional) Run the wp plugin on the result from step 4
 A suitable development environment for the plugin is provided by the
 [AutoDeduct toolchain docker image](https://github.com/rse-verification/auto-deduct-toolchain).
 
+Please note that there are several `TODO` and `FIX ME` sprinkled around the code base.
+There are several test cases with `TODO` to indicate that their oracle file contains
+the result of an unsupported feature. 
+
 ## Limitations
 The plugin is currently limited to programs/specifications following these rules:
 * The entry-point function should contain a top-level contract containing a requires
