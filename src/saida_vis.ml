@@ -498,7 +498,7 @@ let make_harness_func fdec behavs =
   let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
   (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
   let asserts = List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs) in
-  (*TODO: Extract vars only in \old-context instead*)
+  (*TODO: Extract vars only in \old-context instead? *)
   let log_vars_in_post = get_logic_vars asserts in
   let log_vars_in_pre = get_logic_vars assumes in
   let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
