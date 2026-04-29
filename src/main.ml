@@ -71,13 +71,8 @@ let rec modify_acsl_annots ic oc acsl_state line fn_list =
         | (AcslOutside, AcslInside) -> ""
         | (AcslOutside, AcslOutside) when line_is_fun_def fn_list line ->
             (match get_fn_name s' with
-             | name when name = "main" ->
-               (Str.replace_first (Str.regexp "main") "main2" src_line) ^ "\n"
-             | name ->
-               (Self.debug ~level:3 "name:%s %s" name (Kernel.MainFunction.get ());
-               if name = Kernel.MainFunction.get ()
-               then src_line ^ "\n"
-               else "/*@contract@*/\n" ^ src_line ^ "\n"))
+             | name when name = Kernel.MainFunction.get () -> src_line ^ "\n"
+             | name -> "/*@contract@*/\n" ^ src_line ^ "\n")
         | (AcslOutside, AcslOutside) ->
             if (Str.string_match ghost_regex src_line 0) then
               (* Obvioulsy this will only work for single line comments. 

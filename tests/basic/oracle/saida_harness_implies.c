@@ -13,9 +13,8 @@ int a;
 int func() {
   return (a > 0) ? a : 0;
 }
-void main()
+int saida_harness_func_inner()
 {
-  
   
   
   //Function call that the harness function verifies
@@ -23,5 +22,13 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(!(a > 0) || func_result == a);
+  
+}
+void saida_harness_func()
+{
+  
+  //Call inner harness function
+  saida_harness_func_inner();
+  
   
 }

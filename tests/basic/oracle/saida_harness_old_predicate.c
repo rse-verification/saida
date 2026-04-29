@@ -15,21 +15,28 @@ int add_one(int x) {
 }
 
 
-void main2() {
+void main() {
   g = add_one(g);
   g = add_one(g);
 }
-void main()
+void saida_harness_main_inner()
 {
-  
   
   //The requires-clauses translated into assumes
   assume(100 >= g && g >= 0);
   
   //Function call that the harness function verifies
-  main2();
+  main();
   
   //The ensures-clauses translated into asserts
   assert($at("Old", (int)(g >= 0)));
+  
+}
+void saida_harness_main()
+{
+  
+  //Call inner harness function
+  saida_harness_main_inner();
+  
   
 }

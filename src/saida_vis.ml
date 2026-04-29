@@ -517,13 +517,8 @@ let make_harness_func fdec behavs =
   }
 
 
-let rec get_type_decl_string typ =
-  match typ.tnode with
-    | TInt(_) -> "int"
-    | TComp(cinfo) -> Cil.compFullName cinfo
-    | TPtr(inner_type) -> (get_type_decl_string inner_type) ^ " *"
-    | TNamed(tinfo) -> tinfo.torig_name
-    | _ -> "Only_int_or_ptr_or_struct_or_union_supported_in_var_decl"
+let get_type_decl_string typ =
+  Format.asprintf "%a" Printer.pp_typ typ
 
 
 let get_var_decl_string vi =
@@ -680,27 +675,22 @@ class tricera_print out = object (self)
 
   method private print_function_call hf =
     Format.fprintf out "//Function call that the harness function verifies@,";
-    let params =
-      String.concat ", " (List.map (fun vi -> vi.vname) hf.params)
-    in
-    (* Format.fprintf out "%s(%s);@," hf.block.called_func params; *)
-    (*Quick fix main2 for working in tricera*)
-    let s = match hf.return_type.tnode with
+    let params = String.concat ", " (List.map (fun vi -> vi.vname) hf.params) in
+    let result = match hf.return_type.tnode with
       | TVoid -> ""
       | _ ->
         Format.asprintf "%s %s = "
           (get_type_decl_string hf.return_type) (self#result_string hf.block.called_func)
     in
-    let fname = hf.block.called_func in
-    if fname = "main" then
-      Format.fprintf out "%smain2(%s);@,@," s params
-    else
-      Format.fprintf out "%s%s(%s);@,@," s fname params
+    Format.fprintf out "%s%s(%s);@,@," result hf.block.called_func params
+
+  method private inner_harness_name hf = 
+    hf.name ^ "_inner"
 
   method private print_inner_harness_call hf =
     Format.fprintf out "//Call inner harness function@,";
     let params = String.concat ", " (List.map (fun vi -> vi.vname) hf.params) in
-    Format.fprintf out "%s(%s);@,@," hf.name params
+    Format.fprintf out "%s(%s);@,@," (self#inner_harness_name hf) params
 
   method private print_decl fmt vars =
     match vars with
@@ -714,7 +704,8 @@ class tricera_print out = object (self)
   method private print_inner_harness hf =
     Format.fprintf out "@[<v>%s %s(%a)@,@[<v 2>{@," 
       (get_type_decl_string hf.return_type)
-      hf.name self#print_decl hf.params;
+      (self#inner_harness_name hf)
+      self#print_decl hf.params;
 
     (*Print logical variable declarations, e.g. from \forall, \exists or \let*)
     self#print_log_var_decls hf;
@@ -738,7 +729,7 @@ class tricera_print out = object (self)
     Format.fprintf out "@]@,}@,@]" 
     
   method private print_outer_harness hf =
-    Format.fprintf out "@[<v>%s@,@[<v 2>{@," "void main()";
+    Format.fprintf out "@[<v>%s %s()@,@[<v 2>{@," "void" hf.name;
 
     self#print_params_init hf;
     self#print_newline;

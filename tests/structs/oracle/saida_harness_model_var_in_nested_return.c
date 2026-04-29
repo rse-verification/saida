@@ -17,9 +17,8 @@ struct Si {
 struct So start(void) {
   return id(g_s);
 }
-void main()
+struct So saida_harness_start_inner()
 {
-  
   
   //The requires-clauses translated into assumes
   assume(g_s.inner.x >= 0);
@@ -29,5 +28,13 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(start_result.inner<TModel offset not supported: y> == g_s.inner<TModel offset not supported: y>);
+  
+}
+void saida_harness_start()
+{
+  
+  //Call inner harness function
+  saida_harness_start_inner();
+  
   
 }

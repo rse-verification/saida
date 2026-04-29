@@ -32,21 +32,28 @@ int step_towards_0(int x) {
     (\old(g_x) < 0 ==> g_x == \old(g_x)+1) &&
     (\old(g_x) == 0 ==> g_x == 0);
 */
-int main2(void) {
+int main(void) {
     g_x = step_towards_0(g_x);
     return 0;
 }
-void main()
+int saida_harness_main_inner()
 {
   
   
-  
   //Function call that the harness function verifies
-  int main_result = main2();
+  int main_result = main();
   
   //The ensures-clauses translated into asserts
   assert(g_x == 0);
   assert(g_x == $at("Old", (int)(g_x)) + 1);
   assert(g_x == $at("Old", (int)(g_x)) - 1);
+  
+}
+void saida_harness_main()
+{
+  
+  //Call inner harness function
+  saida_harness_main_inner();
+  
   
 }

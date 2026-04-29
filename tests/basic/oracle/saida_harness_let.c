@@ -19,9 +19,8 @@ void f() {
   i = any();
   t[i]++;
 }
-void main()
+void saida_harness_f_inner()
 {
-  
   //Logic var declarations, e.g. from \forall or \exists
   int j;
   
@@ -31,5 +30,13 @@ void main()
   
   //The ensures-clauses translated into asserts
   assert(t[i] == $at("Old", (int)(t[i])) + 1);
+  
+}
+void saida_harness_f()
+{
+  
+  //Call inner harness function
+  saida_harness_f_inner();
+  
   
 }
