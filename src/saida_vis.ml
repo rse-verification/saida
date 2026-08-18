@@ -41,7 +41,6 @@ let term_node_debug_print out tn =
         | TLval(tl) -> Format.fprintf out "0";
         | TSizeOf(_) -> Format.fprintf out "1"(** size of a given C type. *)
         | TSizeOfE (_) -> Format.fprintf out "2" (** size of the type of an expression. *)
-        | TSizeOfStr (_) -> Format.fprintf out "3" (** size of a string constant. *)
         | TAlignOf (_) -> Format.fprintf out "4" (** alignment of a type. *)
         | TAlignOfE (_) -> Format.fprintf out "5" (** alignment of the type of an expression. *)
         | TUnOp (_, _) -> Format.fprintf out "6" (** unary operator. *)
@@ -114,9 +113,9 @@ module HarnessPrinter = struct
   *)
   module Make(Name: FunctionNameProvider) : PrinterExtension
     = functor (X: PrinterClass) -> struct
-    class printer : Printer.extensible_printer = 
+    class printer () : Printer.extensible_printer = 
       object (self)
-        inherit X.printer as super
+        inherit X.printer () as super
 
         val context_func_name = Name.name
         (*
@@ -305,7 +304,7 @@ let snd (a,b) = b
 let rec bounded_vars_term term =
   match term.term_node with
   | TConst _   | TSizeOf _
-  | TSizeOfStr _ | TAlignOf _
+  | TAlignOf _
   | Tnull
   | Ttype _ -> Logic_var.Set.empty
   | TLval lv
@@ -332,7 +331,7 @@ let rec bounded_vars_term term =
       (bounded_vars_term t2)
   | Tif (t1,t2,t3) ->
     Logic_var.Set.union
-      (bounded_vars_term t1)
+      (bounded_vars_predicate t1)
       (Logic_var.Set.union
          (bounded_vars_term t2)
          (bounded_vars_term t3))
@@ -444,7 +443,7 @@ and bounded_vars_predicate p = match p.pred_content with
     -> bounded_vars_predicate p
   | Pif (t,p1,p2) ->
     Logic_var.Set.union
-      (bounded_vars_term t)
+      (bounded_vars_predicate t)
       (Logic_var.Set.union
          (bounded_vars_predicate p1)
          (bounded_vars_predicate p2))
@@ -466,6 +465,9 @@ and bounded_vars_predicate p = match p.pred_content with
   | Pforall (lvs,p) | Pexists (lvs,p) ->
       List.fold_left
         (Fun.flip Logic_var.Set.add) (bounded_vars_predicate p) lvs
+  | Paligned(t1, t2) -> (Logic_var.Set.union
+         (bounded_vars_term t1)
+         (bounded_vars_term t2))
 
 let logic_vars_from_pred pred =
   let free_vars = Cil.extract_free_logicvars_from_predicate pred in
