@@ -69,10 +69,13 @@ The plugin is currently limited to programs/specifications following these rules
 * Partial support for arrays and stack pointers.
 * Heap pointers are generally supported (but bugs exist in some cases in the translation to ACSL).
 * Does not support inference of contracts for functions with local static variables.
-* In the ACSL contract, only ensures and requires clauses over C expressions are support,
+* In the ACSL contract, only ensures, requires, and supported behavior-assumes clauses over C expressions are supported,
   with the exception of certain uses of quantification: universal quantification is supported in
   the post-conditions, and existential quantification in the pre-condition. Other types of ACSL
   built-in or user defined constructs, such as logical functions and predicates, are not supported.
+* Function behaviors with supported C-expression clauses are translated by keeping the default
+  precondition as a harness assumption and guarding each named behavior's postconditions with its
+  pre-state `assumes` and `requires`. Behavior-specific `assigns`, `complete`, and `disjoint` clauses
+  are not translated.
   
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  
-

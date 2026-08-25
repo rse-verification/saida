@@ -494,10 +494,53 @@ let make_harness_func fdec behavs =
           | None -> true
         )
   in
-  (*TODO: Fix so that it can deal with different behaviors*)
-  let assumes = List.concat (List.map (fun b -> b.b_requires) behavs) in
-  (* let behavs_no_def = List.filter (fun b -> b.b_name = "default!") behavs in *)
-  let asserts = List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs) in
+  let is_default_behavior b = Cil.is_default_behavior b in
+  let predicate_of_id_predicate ip = ip.ip_content.tp_statement in
+  let conjunction predicates =
+    Logic_const.pands (List.map predicate_of_id_predicate predicates)
+  in
+  let guarded_postcondition b post =
+    match List.append b.b_assumes b.b_requires with
+    | [] -> post
+    | conditions ->
+      let behavior_condition =
+        conditions |> conjunction |> Logic_const.pold
+      in
+      Logic_const.new_predicate
+        (Logic_const.pimplies
+           (behavior_condition, post.ip_content.tp_statement))
+  in
+  let assumes, asserts =
+    match behavs with
+    | [b] when is_default_behavior b ->
+      (* Preserve the existing encoding for the ordinary single/default
+         behavior case. *)
+      (List.concat (List.map (fun b -> b.b_requires) behavs),
+       List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs))
+    | _ ->
+      (* A behavior's assumes and requires describe its pre-state.  They
+         cannot be concatenated across behaviors: that would require every
+         behavior simultaneously and would make every postcondition
+         unconditional.  Keep the default precondition as a harness assume,
+         and encode each named behavior as an old-state implication. *)
+      let default_assumes =
+        behavs
+        |> List.filter is_default_behavior
+        |> List.concat_map (fun b -> b.b_requires)
+      in
+      let behavior_asserts =
+        behavs
+        |> List.filter (fun b -> not (is_default_behavior b))
+        |> List.concat_map (fun b ->
+          List.map (guarded_postcondition b) (List.map snd b.b_post_cond))
+      in
+      let default_asserts =
+        behavs
+        |> List.filter is_default_behavior
+        |> List.concat_map (fun b -> List.map snd b.b_post_cond)
+      in
+      (default_assumes, default_asserts @ behavior_asserts)
+  in
   (*TODO: Extract vars only in \old-context instead? *)
   let log_vars_in_post = get_logic_vars asserts in
   let log_vars_in_pre = get_logic_vars assumes in
