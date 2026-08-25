@@ -102,5 +102,8 @@ The plugin is currently limited to programs/specifications following these rules
   therefore be checked by downstream WP. Behavior-specific `assigns` clauses are rejected.
   Allocation clauses, `terminates`/`decreases` clauses, extended clauses, and non-normal
   postconditions are also rejected rather than silently omitted.
+* A `\let` binding created outside `\old` or `\at` cannot be used inside that labelled
+   expression. Saida rejects this pattern instead of inlining a post-state alias into an
+   old-state expression; move the binding inside the label or write the expression explicitly.
   
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  
