@@ -1,0 +1,2 @@
+[saida] User Error: Unsupported \\let binding 'post_index' across an ACSL state label. The binding was created outside \\old/\\at but is used inside it; Saida refuses to inline this expression because it could change the state of the aliased value. Move the \\let inside the label or write the labelled expression explicitly.
+[kernel] Plug-in saida aborted: invalid user input.

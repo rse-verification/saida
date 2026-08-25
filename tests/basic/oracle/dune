@@ -4,6 +4,12 @@
 (rule (target "let2.err.oracle") (mode fallback) (action (write-file "let2.err.oracle" "")))
 (rule (target "let2.res.oracle") (mode fallback) (action (write-file "let2.res.oracle" "")))
 (rule (target "saida_harness_let2.c") (mode fallback) (action (write-file "saida_harness_let2.c" "")))
+(rule (target "old_logic_alias.err.oracle") (mode fallback) (action (write-file "old_logic_alias.err.oracle" "")))
+(rule (target "old_logic_alias.res.oracle") (mode fallback) (action (write-file "old_logic_alias.res.oracle" "")))
+(rule (target "saida_harness_old_logic_alias.c") (mode fallback) (action (write-file "saida_harness_old_logic_alias.c" "")))
+(rule (target "old_logic_alias_inline.err.oracle") (mode fallback) (action (write-file "old_logic_alias_inline.err.oracle" "")))
+(rule (target "old_logic_alias_inline.res.oracle") (mode fallback) (action (write-file "old_logic_alias_inline.res.oracle" "")))
+(rule (target "saida_harness_old_logic_alias_inline.c") (mode fallback) (action (write-file "saida_harness_old_logic_alias_inline.c" "")))
 (rule (target "sum.err.oracle") (mode fallback) (action (write-file "sum.err.oracle" "")))
 (rule (target "sum.res.oracle") (mode fallback) (action (write-file "sum.res.oracle" "")))
 (rule (target "sum.out.c") (mode fallback) (action (write-file "sum.out.c" "")))
@@ -49,4 +55,3 @@
 (rule (target "ternary_predicate.res.oracle") (mode fallback) (action (write-file "ternary_predicate.res.oracle" "")))
 (rule (target "ternary_predicate.out.c") (mode fallback) (action (write-file "ternary_predicate.out.c" "")))
 (rule (target "saida_harness_ternary_predicate.c") (mode fallback) (action (write-file "saida_harness_ternary_predicate.c" "")))
-

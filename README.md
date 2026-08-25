@@ -73,6 +73,8 @@ The plugin is currently limited to programs/specifications following these rules
   with the exception of certain uses of quantification: universal quantification is supported in
   the post-conditions, and existential quantification in the pre-condition. Other types of ACSL
   built-in or user defined constructs, such as logical functions and predicates, are not supported.
+* A `\let` binding created outside `\old` or `\at` cannot be used inside that labelled
+  expression. Saida rejects this pattern instead of inlining a post-state alias into an
+  old-state expression; move the binding inside the label or write the expression explicitly.
   
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  
-
