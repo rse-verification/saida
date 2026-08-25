@@ -195,8 +195,19 @@ module HarnessPrinter = struct
                      lv.lv_name
                  else
                    (match l_body with
-                   | LBterm(t) -> self#term  fmt t;
-                   | LBpred(p) -> self#predicate fmt p;
+                   | LBterm({ term_node = TLval(body_lval); _ } as body_term) ->
+                       let body_lval = Logic_const.addTermOffsetLval toff body_lval in
+                       self#term fmt { body_term with term_node = TLval body_lval }
+                   | LBterm _ when toff <> TNoOffset ->
+                       Options_saida.Self.abort
+                         "Unsupported offset on \\let binding '%s'. Saida can preserve array and field offsets only when the binding body is an lvalue; write the indexed or field expression explicitly."
+                         lv.lv_name
+                   | LBterm(t) -> self#term fmt t;
+                   | LBpred(p) when toff = TNoOffset -> self#predicate fmt p;
+                   | LBpred _ ->
+                       Options_saida.Self.abort
+                         "Unsupported offset on predicate \\let binding '%s'. Saida can preserve array and field offsets only for term lvalues."
+                         lv.lv_name
                    | _ -> ()  (*Shouldnt happen*))
               | None ->
                   super#term_lval fmt (tlh, toff);
