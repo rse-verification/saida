@@ -37,6 +37,12 @@
 (rule (target "behavior.res.oracle") (mode fallback) (action (write-file "behavior.res.oracle" "")))
 (rule (target "behavior.out.c") (mode fallback) (action (write-file "behavior.out.c" "")))
 (rule (target "saida_harness_behavior.c") (mode fallback) (action (write-file "saida_harness_behavior.c" "")))
+(rule (target "default_behavior_assumes.err.oracle") (mode fallback) (action (write-file "default_behavior_assumes.err.oracle" "")))
+(rule (target "default_behavior_assumes.res.oracle") (mode fallback) (action (write-file "default_behavior_assumes.res.oracle" "")))
+(rule (target "default_behavior_assumes.out.c") (mode fallback) (action (write-file "default_behavior_assumes.out.c" "")))
+(rule (target "saida_harness_default_behavior_assumes.c") (mode fallback) (action (write-file "saida_harness_default_behavior_assumes.c" "")))
+(rule (target "unsupported_behavior_assigns.err.oracle") (mode fallback) (action (write-file "unsupported_behavior_assigns.err.oracle" "")))
+(rule (target "unsupported_behavior_assigns.res.oracle") (mode fallback) (action (write-file "unsupported_behavior_assigns.res.oracle" "")))
 (rule (target "ternary_term.err.oracle") (mode fallback) (action (write-file "ternary_term.err.oracle" "")))
 (rule (target "ternary_term.res.oracle") (mode fallback) (action (write-file "ternary_term.res.oracle" "")))
 (rule (target "ternary_term.out.c") (mode fallback) (action (write-file "ternary_term.out.c" "")))
@@ -49,4 +55,3 @@
 (rule (target "ternary_predicate.res.oracle") (mode fallback) (action (write-file "ternary_predicate.res.oracle" "")))
 (rule (target "ternary_predicate.out.c") (mode fallback) (action (write-file "ternary_predicate.out.c" "")))
 (rule (target "saida_harness_ternary_predicate.c") (mode fallback) (action (write-file "saida_harness_ternary_predicate.c" "")))
-

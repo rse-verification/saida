@@ -1,0 +1,3 @@
+[kernel] Parsing unsupported_behavior_assigns.c (with preprocessing)
+[saida] User Error: Unsupported assigns clause in behavior update of function main
+[kernel] Plug-in saida aborted: invalid user input.

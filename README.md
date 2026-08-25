@@ -76,6 +76,7 @@ The plugin is currently limited to programs/specifications following these rules
 * Function behaviors with supported C-expression clauses are translated by keeping the default
   precondition as a harness assumption and guarding each named behavior's postconditions with its
   pre-state `assumes` and `requires`. Behavior-specific `assigns`, `complete`, and `disjoint` clauses
-  are not translated.
+  are rejected with an explicit diagnostic instead of being silently omitted. Function-level
+  `assigns` clauses remain outside the generated harness assertions.
   
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  

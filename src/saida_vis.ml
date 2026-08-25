@@ -481,7 +481,8 @@ let logic_vars_from_id_pred_list id_pred_list =
       Logic_var.Set.empty
 
 
-let make_harness_func fdec behavs =
+let make_harness_func fdec spec =
+  let behavs = spec.spec_behavior in
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 
     predicates
     |> List.map (fun ip -> logic_vars_from_pred ip.ip_content.tp_statement)
@@ -495,6 +496,27 @@ let make_harness_func fdec behavs =
         )
   in
   let is_default_behavior b = Cil.is_default_behavior b in
+  let reject_unsupported_clauses () =
+    if spec.spec_complete_behaviors <> [] then
+      Options_saida.Self.abort
+        "Unsupported complete behaviors in the contract of %s"
+        fdec.svar.vorig_name;
+    if spec.spec_disjoint_behaviors <> [] then
+      Options_saida.Self.abort
+        "Unsupported disjoint behaviors in the contract of %s"
+        fdec.svar.vorig_name;
+    List.iter
+      (fun b ->
+        if not (is_default_behavior b) then
+          match b.b_assigns with
+          | WritesAny -> ()
+          | Writes _ ->
+            Options_saida.Self.abort
+              "Unsupported assigns clause in behavior %s of function %s"
+              b.b_name fdec.svar.vorig_name)
+      behavs
+  in
+  reject_unsupported_clauses ();
   let predicate_of_id_predicate ip = ip.ip_content.tp_statement in
   let conjunction predicates =
     Logic_const.pands (List.map predicate_of_id_predicate predicates)
@@ -515,7 +537,7 @@ let make_harness_func fdec behavs =
     | [b] when is_default_behavior b ->
       (* Preserve the existing encoding for the ordinary single/default
          behavior case. *)
-      (List.concat (List.map (fun b -> b.b_requires) behavs),
+      (List.concat (List.map (fun b -> b.b_assumes @ b.b_requires) behavs),
        List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs))
     | _ ->
       (* A behavior's assumes and requires describe its pre-state.  They
@@ -526,7 +548,7 @@ let make_harness_func fdec behavs =
       let default_assumes =
         behavs
         |> List.filter is_default_behavior
-        |> List.concat_map (fun b -> b.b_requires)
+        |> List.concat_map (fun b -> b.b_assumes @ b.b_requires)
       in
       let behavior_asserts =
         behavs
@@ -652,7 +674,7 @@ class acsl2tricera = object (self)
   (*Spec visited from here*)
   method! vspec s =
     if (List.length s.spec_behavior) > 0 then 
-      hf_list <- (make_harness_func (Option.get(curr_func)) s.spec_behavior)::hf_list;
+      hf_list <- (make_harness_func (Option.get(curr_func)) s)::hf_list;
     Cil.SkipChildren
 end
 
