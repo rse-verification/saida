@@ -118,15 +118,23 @@ module HarnessPrinter = struct
         inherit X.printer () as super
 
         val context_func_name = Name.name
-        (*
-          FIX ME: \let variables should be local to each clause.
-            Currently they are kept for the whole function specification.
-         *)
+        (* A binding is valid only while its Tlet/Plet body is printed. *)
         val mutable let_var_defs = Logic_var.Hashtbl.create 10
+        (* Number of enclosing ACSL labels while the binding is active. *)
+        val mutable label_depth = 0
   
-        method private add_let_var_def b =
+        method private with_let_var_def b f =
           (Options_saida.Self.debug ~level:3 "adding let var: %s" b.l_var_info.lv_name);
-          Logic_var.Hashtbl.add let_var_defs b.l_var_info b.l_body;
+          let previous = Logic_var.Hashtbl.find_opt let_var_defs b.l_var_info in
+          Logic_var.Hashtbl.remove let_var_defs b.l_var_info;
+          Logic_var.Hashtbl.add let_var_defs b.l_var_info (b.l_body, label_depth);
+          Fun.protect
+            ~finally:(fun () ->
+              Logic_var.Hashtbl.remove let_var_defs b.l_var_info;
+              match previous with
+              | Some value -> Logic_var.Hashtbl.add let_var_defs b.l_var_info value
+              | None -> ())
+            f;
   
         (* Note: Must match whatever tricera_print is using *)
         method private result_string (fname : string) =
@@ -135,10 +143,15 @@ module HarnessPrinter = struct
         method private wrap_in_label : 'a. 
           Format.formatter -> logic_label -> logic_type -> (Format.formatter -> 'a -> unit) -> 'a -> unit = 
             fun fmt ll t f arg ->
-              Format.fprintf fmt "$at(\"%a\", (%a)(%a))"
-                  super#logic_label ll
-                  (self#typ None) (Logic_utils.logicCType (to_c_type t))
-                  f arg;
+              let previous_depth = label_depth in
+              label_depth <- previous_depth + 1;
+              Fun.protect
+                ~finally:(fun () -> label_depth <- previous_depth)
+                (fun () ->
+                  Format.fprintf fmt "$at(\"%a\", (%a)(%a))"
+                    super#logic_label ll
+                    (self#typ None) (Logic_utils.logicCType (to_c_type t))
+                    f arg);
 
         (* Disallow TModel in offsets *)
         method! term_offset fmt (toff : term_offset) =
@@ -174,17 +187,16 @@ module HarnessPrinter = struct
               (* first, check if it is a let-variable *)
               (Options_saida.Self.debug ~level:3 "printer looking up let var: %s" lv.lv_name);
               match Logic_var.Hashtbl.find_opt let_var_defs lv with
-              | Some(l_body) ->
-                 (match l_body with
-                 (* TODO: Currently expands body inplace. This is NOT the proper thing to do
-                      when e.g. \old(...) is involved. See e.g. let.c for an example where
-                      expansion leads to using an old value when a post value should be used.
-                      See Example 2.31 in https://www.frama-c.com/download/acsl-1.22.pdf
-                      for an other illustration of the problem. 
-                 *)
-                  | LBterm(t) -> self#term  fmt t;
-                  | LBpred(p) -> self#predicate fmt p;
-                  | _ -> ()  (*Shouldnt happen*))
+              | Some(l_body, binding_depth) ->
+                 if label_depth > binding_depth then
+                   Options_saida.Self.abort
+                     "Unsupported \\let binding '%s' across an ACSL state label. The binding was created outside \\old/\\at but is used inside it; Saida refuses to inline this expression because it could change the state of the aliased value. Move the \\let inside the label or write the labelled expression explicitly."
+                     lv.lv_name
+                 else
+                   (match l_body with
+                   | LBterm(t) -> self#term  fmt t;
+                   | LBpred(p) -> self#predicate fmt p;
+                   | _ -> ()  (*Shouldnt happen*))
               | None ->
                   super#term_lval fmt (tlh, toff);
   
@@ -205,8 +217,7 @@ module HarnessPrinter = struct
           | Tat(inner, ll) ->
               self#wrap_in_label fmt ll (inner.term_type) self#term inner;
           | Tlet(def, body) ->
-            self#add_let_var_def def;
-            self#term fmt body;
+            self#with_let_var_def def (fun () -> self#term fmt body);
           | _ ->
             Format.fprintf fmt "Unsupported term received";
             term_node_debug_print fmt t.term_node;
@@ -255,8 +266,7 @@ module HarnessPrinter = struct
               let p_or_notp = Por(p, notp) in
               self#predicate_node fmt p_or_notp;
             | Plet(b, p) ->
-              self#add_let_var_def b;
-              self#predicate fmt p;
+              self#with_let_var_def b (fun () -> self#predicate fmt p);
             | Pvalid(ll, t) ->
               (* FIX ME: The corresponding option to tricera is -valid-deref and
                   works on the complete program level. Hence, to translate this
