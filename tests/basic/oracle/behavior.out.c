@@ -5,8 +5,7 @@
 */
 
 /*
-  Tests translation of behavior clauses. 
-  TODO: Not supported yet.
+  Tests translation of behavior clauses with distinct pre-state assumptions.
 */
 
 int g_x;
@@ -35,7 +34,7 @@ int step_towards_0(int x) {
 */
 /*
   The above contract should be translated like the equivalent
-  one below, but it currently is not.
+  one below.
 
   assigns g_x;
   ensures 
