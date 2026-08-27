@@ -1,1 +1,3 @@
 [kernel] Parsing model_var_in_nested_return.c (with preprocessing)
+[saida] User Error: TriCera did not report an explicit SAFE verdict while inferring contracts for harness saida_harness_start
+[kernel] Plug-in saida aborted: invalid user input.

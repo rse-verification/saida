@@ -89,11 +89,13 @@ let rec modify_acsl_annots ic oc acsl_state line fn_list =
 (*File reading from Rosetta code ("read entire file")*)
 let source_w_harness source_fname hbuff fn_list dest_fname =
   let source_chan = open_in source_fname in
-  let dest_chan = open_out dest_fname in
-  modify_acsl_annots source_chan dest_chan AcslOutside 1 fn_list;
-  Buffer.output_buffer dest_chan hbuff;
-  close_in source_chan;
-  close_out dest_chan
+  Fun.protect
+    ~finally:(fun () -> close_in_noerr source_chan)
+    (fun () ->
+      let dest_chan = artifact_channel dest_fname in
+      modify_acsl_annots source_chan dest_chan AcslOutside 1 fn_list;
+      Buffer.output_buffer dest_chan hbuff;
+      flush dest_chan)
 
 
 let rec add_inferred_to_source ic buff ht line fn_list =
@@ -119,9 +121,27 @@ let rec add_inferred_to_source ic buff ht line fn_list =
 
 let run_wp_plugin filename =
   Self.feedback "wp plugin started for file '%s'" filename;
-  let libentry = if Kernel.LibEntry.get () then "-lib-entry" else "" in
-  let _ = Sys.command ("frama-c -wp " ^ filename ^ " " ^ libentry) in
-  ()
+  let entrypoint = Kernel.MainFunction.get () in
+  let keep = KeepTempFiles.get () in
+  with_artifact
+    ~keep ~prefix:"saida_wp_" ~original:(filename ^ ".log")
+    (fun log ->
+      let arguments =
+        ["-wp"; "-main"; entrypoint]
+        @ (if Kernel.LibEntry.get () then ["-lib-entry"] else [])
+        @ [filename]
+      in
+      let wp_exit = run_process "frama-c" arguments log in
+      close_artifact log;
+      let log_fname = artifact_path log in
+      if wp_exit <> 0 then
+        Self.abort
+          "WP failed with exit status %d; output: %s"
+          wp_exit log_fname;
+      match validate_wp_result log_fname with
+      | Error diagnostic -> Self.abort "%s" diagnostic
+      | Ok (proved, total) ->
+        Self.feedback "WP proved %d of %d goals" proved total)
 
 
 
@@ -137,27 +157,14 @@ let merge_source_w_inferred source_file fn_list result_fname out_fname =
   close_out out_chan
 
 
-let get_tmp_fname keep_file prefix orig_fname =
-  let fname = Filename.basename orig_fname in
-  if keep_file then 
-    Filename.concat
-      (Filename.dirname orig_fname)
-      (prefix ^ fname)
-  else 
-    Filename.temp_file 
-      ~temp_dir:(Filename.get_temp_dir_name ()) prefix ("_" ^ fname)
-  
-let get_harness_fname keep_file orig_fname =
-  get_tmp_fname keep_file "saida_harness_" orig_fname
-
-
-let get_result_fname keep_file orig_fname =
-  get_tmp_fname keep_file "saida_result_" orig_fname
-
-
 let run () =
   try
   if Enabled.get () then
+    let source_fname =
+      match Input_validation.select_single_source (Kernel.Files.get ()) with
+      | Ok source -> Filepath.to_string source
+      | Error diagnostic -> Self.abort "%s" diagnostic
+    in
 
     let a2t = new acsl2tricera in
     let { fundec_locations = fn_list
@@ -176,28 +183,44 @@ let run () =
     let _ = Format.pp_print_flush fmt () in
 
     let output_fname = OutputFile.get () in
-    match Kernel.Files.get () with
-    | [] -> Self.result "Error, no source file found"
-    | head::tail ->
-        if List.length tail > 0 then
-          Self.feedback "Warning, more then 1 source file found, using only first";
-
-        let source_fname = Filepath.to_string head in
-        let harness_fname = get_harness_fname (KeepTempFiles.get ()) source_fname in
-        let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
-        source_w_harness source_fname harness_buff fn_list harness_fname;
-        ignore (run_tricera 
-          (TriceraPath.get ())
-          (Kernel.LibEntry.get ())
-          harness_func.name
-          (TriceraOptions.get ())
-          harness_fname result_fname);
-        merge_source_w_inferred source_fname fn_list result_fname output_fname;
-        if Run_wp.get () then
-          let fname = output_fname
-          in run_wp_plugin fname;
+    let keep = KeepTempFiles.get () in
+    with_artifact
+      ~keep ~prefix:"saida_harness_" ~original:source_fname
+      (fun harness ->
+        source_w_harness source_fname harness_buff fn_list harness;
+        close_artifact harness;
+        with_artifact
+          ~keep ~prefix:"saida_result_" ~original:source_fname
+          (fun result ->
+            let tricera_exit =
+              match run_tricera
+                    (TriceraPath.get ())
+                    (Kernel.LibEntry.get ())
+                    harness_func.name
+                    (TriceraOptions.get ())
+                    (artifact_path harness) result
+              with
+              | Ok exit_code -> exit_code
+              | Error diagnostic ->
+                Self.abort "TriCera invocation rejected: %s" diagnostic
+            in
+            close_artifact result;
+            let result_fname = artifact_path result in
+            if tricera_exit <> 0 then
+              Self.abort
+                "TriCera failed for harness %s with exit status %d; output: %s"
+                harness_func.name tricera_exit result_fname;
+            (match validate_tricera_result result_fname with
+             | Ok () -> ()
+             | Error diagnostic ->
+               Self.abort
+                 "%s while inferring contracts for harness %s"
+                 diagnostic harness_func.name);
+            merge_source_w_inferred
+              source_fname fn_list result_fname output_fname;
+            if Run_wp.get () then run_wp_plugin output_fname));
   with Sys_error _ as exc ->
     let msg = Printexc.to_string exc in
-      Printf.eprintf "There was an error: %s\n" msg
+    Self.abort "I/O error: %s" msg
 
 let () = Boot.Main.extend run

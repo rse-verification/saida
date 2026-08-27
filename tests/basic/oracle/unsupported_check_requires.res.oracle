@@ -1,0 +1,3 @@
+[kernel] Parsing unsupported_check_requires.c (with preprocessing)
+[saida] User Error: Unsupported check predicate kind on requires in behavior bounded of function entry; Saida cannot preserve its proof semantics
+[kernel] Plug-in saida aborted: invalid user input.

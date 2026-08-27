@@ -55,7 +55,8 @@ module TriceraOptions = Self.String
     let option_name = "-saida-tricera-opts"
     let default = "-log"
     let arg_name = "tricera_opts"
-    let help = "Options to pass to TriCera (default: -log)."
+    let help =
+      "Options to pass to TriCera without shell expansion; quote values that contain spaces (default: -log)."
   end)  
 
 (*option for keeping temporary generated files to/from TriCera*)

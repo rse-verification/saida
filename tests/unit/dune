@@ -1,0 +1,3 @@
+(test
+ (name result_validation_tests)
+ (libraries frama-c-saida.core frama-c.init.cmdline unix))

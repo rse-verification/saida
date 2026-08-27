@@ -1,1 +1,4 @@
 [kernel] Parsing let.c (with preprocessing)
+[saida] Warning: [SAIDA-W001] The function-level assigns clause of f is preserved but is not checked by Saida's inference harness; validate the complete contract with WP.
+[saida] User Error: TriCera did not report an explicit SAFE verdict while inferring contracts for harness saida_harness_f
+[kernel] Plug-in saida aborted: invalid user input.

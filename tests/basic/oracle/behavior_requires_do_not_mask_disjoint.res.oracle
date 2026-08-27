@@ -1,0 +1,3 @@
+[kernel] Parsing behavior_requires_do_not_mask_disjoint.c (with preprocessing)
+[saida] User Error: TriCera reported UNSAFE while inferring contracts for harness saida_harness_entry
+[kernel] Plug-in saida aborted: invalid user input.

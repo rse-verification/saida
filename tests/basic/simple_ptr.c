@@ -1,5 +1,5 @@
 /* run.config
-   LOG: @PTEST_NAME@.out.c
+   EXIT: 1
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
 */
 /*

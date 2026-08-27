@@ -1,4 +1,5 @@
 /* run.config
+   EXIT: 1
    LOG: saida_harness_@PTEST_NAME@.c
    OPT: -lib-entry -main=f -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */

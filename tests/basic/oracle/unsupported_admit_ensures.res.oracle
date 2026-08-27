@@ -1,0 +1,3 @@
+[kernel] Parsing unsupported_admit_ensures.c (with preprocessing)
+[saida] User Error: Unsupported admit predicate kind on ensures in behavior identity of function entry; Saida cannot preserve its proof semantics
+[kernel] Plug-in saida aborted: invalid user input.

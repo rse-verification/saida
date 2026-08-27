@@ -283,6 +283,8 @@ type harness_func = {
   mutable name: string;
   mutable block: harness_block;
   mutable assumes: Cil_types.identified_predicate list;
+  mutable pre_call_asserts: Cil_types.identified_predicate list;
+  mutable behavior_requires: Cil_types.identified_predicate list;
   mutable asserts: Cil_types.identified_predicate list;
   mutable params: Cil_types.varinfo list;
   mutable return_type: Cil_types.typ
@@ -481,6 +483,32 @@ let logic_vars_from_id_pred_list id_pred_list =
       Logic_var.Set.empty
 
 
+class quantifier_finder existential universal = object
+  inherit Visitor.frama_c_inplace
+
+  method! vpredicate predicate =
+    match predicate.pred_content with
+    | Pexists _ ->
+      existential := true;
+      Cil.DoChildren
+    | Pforall _ ->
+      universal := true;
+      Cil.DoChildren
+    | _ -> Cil.DoChildren
+end
+
+
+let predicate_quantifiers predicate =
+  let existential = ref false in
+  let universal = ref false in
+  let visitor = new quantifier_finder existential universal in
+  ignore
+    (Visitor.visitFramacPredicate
+       (visitor :> Visitor.frama_c_visitor)
+       predicate);
+  (!existential, !universal)
+
+
 let make_harness_func fdec spec =
   let behavs = spec.spec_behavior in
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 
@@ -496,24 +524,82 @@ let make_harness_func fdec spec =
         )
   in
   let is_default_behavior b = Cil.is_default_behavior b in
+  let predicate_kind_name = function
+    | Assert -> "assert"
+    | Check -> "check"
+    | Admit -> "admit"
+  in
+  let reject_unsupported_predicate ~allow_universal behavior clause predicate =
+    let existential, universal =
+      predicate_quantifiers predicate.ip_content.tp_statement
+    in
+    if existential then
+      Options_saida.Self.abort
+        "[SAIDA-E001] Existential quantification is unsupported on %s in behavior %s of function %s"
+        clause behavior.b_name fdec.svar.vorig_name;
+    if universal && not allow_universal then
+      Options_saida.Self.abort
+        "[SAIDA-E004] Universal quantification is supported only on postconditions; found it on %s in behavior %s of function %s"
+        clause behavior.b_name fdec.svar.vorig_name;
+    match predicate.ip_content.tp_kind with
+     | Assert -> ()
+     | kind ->
+       Options_saida.Self.abort
+         "Unsupported %s predicate kind on %s in behavior %s of function %s; Saida cannot preserve its proof semantics"
+         (predicate_kind_name kind) clause behavior.b_name
+         fdec.svar.vorig_name
+  in
   let reject_unsupported_clauses () =
-    if spec.spec_complete_behaviors <> [] then
+    if spec.spec_variant <> None then
       Options_saida.Self.abort
-        "Unsupported complete behaviors in the contract of %s"
+        "Unsupported decreases clause in the contract of %s"
         fdec.svar.vorig_name;
-    if spec.spec_disjoint_behaviors <> [] then
+    if spec.spec_terminates <> None then
       Options_saida.Self.abort
-        "Unsupported disjoint behaviors in the contract of %s"
+        "Unsupported terminates clause in the contract of %s"
         fdec.svar.vorig_name;
     List.iter
       (fun b ->
-        if not (is_default_behavior b) then
-          match b.b_assigns with
-          | WritesAny -> ()
-          | Writes _ ->
+        List.iter
+          (reject_unsupported_predicate ~allow_universal:false b "assumes")
+          b.b_assumes;
+        List.iter
+          (reject_unsupported_predicate ~allow_universal:false b "requires")
+          b.b_requires;
+        List.iter
+          (fun (_, predicate) ->
+            reject_unsupported_predicate
+              ~allow_universal:true b "ensures" predicate)
+          b.b_post_cond;
+        (match b.b_assigns with
+         | WritesAny -> ()
+         | Writes _ when is_default_behavior b ->
+           Options_saida.Self.warning
+             "[SAIDA-W001] The function-level assigns clause of %s is preserved but is not checked by Saida's inference harness; validate the complete contract with WP."
+             fdec.svar.vorig_name
+         | Writes _ ->
             Options_saida.Self.abort
               "Unsupported assigns clause in behavior %s of function %s"
-              b.b_name fdec.svar.vorig_name)
+              b.b_name fdec.svar.vorig_name);
+        (match b.b_allocation with
+         | FreeAllocAny -> ()
+         | FreeAlloc _ ->
+           Options_saida.Self.abort
+             "Unsupported allocation clause in behavior %s of function %s"
+             b.b_name fdec.svar.vorig_name);
+        if b.b_extended <> [] then
+          Options_saida.Self.abort
+            "Unsupported extended clause in behavior %s of function %s"
+            b.b_name fdec.svar.vorig_name;
+        List.iter
+          (fun (kind, _) ->
+            match kind with
+            | Normal -> ()
+            | Exits | Breaks | Continues | Returns ->
+              Options_saida.Self.abort
+                "Unsupported non-normal postcondition in behavior %s of function %s"
+                b.b_name fdec.svar.vorig_name)
+          b.b_post_cond)
       behavs
   in
   reject_unsupported_clauses ();
@@ -521,52 +607,76 @@ let make_harness_func fdec spec =
   let conjunction predicates =
     Logic_const.pands (List.map predicate_of_id_predicate predicates)
   in
+  let replace_predicate predicate statement =
+    Logic_const.new_predicate
+      ~kind:predicate.ip_content.tp_kind
+      statement
+  in
+  let behavior_condition b = conjunction b.b_assumes in
+  let complete_assertions =
+    spec.spec_complete_behaviors
+    |> List.map (fun names ->
+      Ast_info.complete_behaviors spec names
+      |> Logic_const.new_predicate)
+  in
+  let disjoint_assertions =
+    spec.spec_disjoint_behaviors
+    |> List.map (fun names ->
+      Ast_info.disjoint_behaviors spec names
+      |> Logic_const.new_predicate)
+  in
+  let conditional_requirements b =
+    if b.b_assumes = [] then b.b_requires
+    else
+      List.map
+        (fun requirement ->
+          replace_predicate requirement
+            (Logic_const.pimplies
+               (behavior_condition b,
+                predicate_of_id_predicate requirement)))
+        b.b_requires
+  in
   let guarded_postcondition b post =
-    match List.append b.b_assumes b.b_requires with
+    match b.b_assumes with
     | [] -> post
-    | conditions ->
-      let behavior_condition =
-        conditions |> conjunction |> Logic_const.pold
-      in
-      Logic_const.new_predicate
-        (Logic_const.pimplies
-           (behavior_condition, post.ip_content.tp_statement))
-  in
-  let assumes, asserts =
-    match behavs with
-    | [b] when is_default_behavior b ->
-      (* Preserve the existing encoding for the ordinary single/default
-         behavior case. *)
-      (List.concat (List.map (fun b -> b.b_assumes @ b.b_requires) behavs),
-       List.concat (List.map (fun b -> List.map snd b.b_post_cond) behavs))
     | _ ->
-      (* A behavior's assumes and requires describe its pre-state.  They
-         cannot be concatenated across behaviors: that would require every
-         behavior simultaneously and would make every postcondition
-         unconditional.  Keep the default precondition as a harness assume,
-         and encode each named behavior as an old-state implication. *)
-      let default_assumes =
-        behavs
-        |> List.filter is_default_behavior
-        |> List.concat_map (fun b -> b.b_assumes @ b.b_requires)
-      in
-      let behavior_asserts =
-        behavs
-        |> List.filter (fun b -> not (is_default_behavior b))
-        |> List.concat_map (fun b ->
-          List.map (guarded_postcondition b) (List.map snd b.b_post_cond))
-      in
-      let default_asserts =
-        behavs
-        |> List.filter is_default_behavior
-        |> List.concat_map (fun b -> List.map snd b.b_post_cond)
-      in
-      (default_assumes, default_asserts @ behavior_asserts)
+      replace_predicate post
+        (Logic_const.pimplies
+           (Logic_const.pold (behavior_condition b),
+            post.ip_content.tp_statement))
   in
+  let assumes =
+    behavs
+    |> List.filter is_default_behavior
+    |> List.concat_map (fun b -> b.b_requires)
+  in
+  let behavior_requires =
+    behavs
+    |> List.filter (fun b -> not (is_default_behavior b))
+    |> List.concat_map conditional_requirements
+  in
+  let behavior_asserts =
+    behavs
+    |> List.filter (fun b -> not (is_default_behavior b))
+    |> List.concat_map (fun b ->
+      List.map (guarded_postcondition b) (List.map snd b.b_post_cond))
+  in
+  let default_asserts =
+    behavs
+    |> List.filter is_default_behavior
+    |> List.concat_map (fun b -> List.map snd b.b_post_cond)
+  in
+  let asserts = default_asserts @ behavior_asserts in
+  let pre_call_asserts = complete_assertions @ disjoint_assertions in
   (*TODO: Extract vars only in \old-context instead? *)
   let log_vars_in_post = get_logic_vars asserts in
+  let log_vars_in_pre_asserts = get_logic_vars pre_call_asserts in
+  let log_vars_in_behavior_requires = get_logic_vars behavior_requires in
   let log_vars_in_pre = get_logic_vars assumes in
-  let all_log_vars = List.append log_vars_in_pre log_vars_in_post in
+  let all_log_vars =
+    log_vars_in_pre @ log_vars_in_pre_asserts
+    @ log_vars_in_behavior_requires @ log_vars_in_post
+  in
   let h_block = { called_func = fdec.svar.vorig_name; log_vars = all_log_vars} in
   let f_ret_type = match fdec.svar.vtype.tnode with
     | TFun(r, _, _) -> r
@@ -575,6 +685,8 @@ let make_harness_func fdec spec =
   { name = Format.sprintf "saida_harness_%s" fdec.svar.vorig_name
   ; block = h_block
   ; assumes = assumes
+  ; pre_call_asserts = pre_call_asserts
+  ; behavior_requires = behavior_requires
   ; asserts = asserts
   ; params = fdec.sformals
   ; return_type = f_ret_type;
@@ -722,6 +834,30 @@ class tricera_print out = object (self)
             Printer.pp_predicate_node ip.ip_content.tp_statement.pred_content)
         asserts
 
+  method private print_pre_call_asserts hf =
+    match hf.pre_call_asserts with
+    | [] -> ()
+    | assertions ->
+      Format.fprintf out
+        "//The complete/disjoint behavior declarations translated into asserts@,";
+      List.iter
+        (fun ip ->
+          Format.fprintf out "assert(%a);@,"
+            Printer.pp_predicate_node ip.ip_content.tp_statement.pred_content)
+        assertions
+
+  method private print_behavior_require_assumes hf =
+    match hf.behavior_requires with
+    | [] -> ()
+    | requirements ->
+      Format.fprintf out
+        "//Behavior-specific requires translated into conditional assumes@,";
+      List.iter
+        (fun ip ->
+          Format.fprintf out "assume(%a);@,"
+            Printer.pp_predicate_node ip.ip_content.tp_statement.pred_content)
+        requirements
+
   method private print_log_var_decls hf =
     match hf.block.log_vars with
     | [] -> ()
@@ -779,6 +915,21 @@ class tricera_print out = object (self)
     (*Print the assumes (from pre-cond)*)
     self#print_require_assumes hf;
     self#print_newline;
+
+    (*Prove complete/disjoint behavior declarations before the function call.*)
+    (match hf.pre_call_asserts with
+     | [] -> ()
+     | _ ->
+       self#print_pre_call_asserts hf;
+       self#print_newline);
+
+    (*Apply behavior-specific requires only after checking coverage and
+      exclusion under the function's main precondition.*)
+    (match hf.behavior_requires with
+     | [] -> ()
+     | _ ->
+       self#print_behavior_require_assumes hf;
+       self#print_newline);
 
     (*Print assumes for special ghost-var ensures*)
     (*experimental feature*)

@@ -1,0 +1,2 @@
+[kernel] Parsing bare_complete_disjoint_behaviors.c (with preprocessing)
+[saida] Warning: [SAIDA-W001] The function-level assigns clause of entry is preserved but is not checked by Saida's inference harness; validate the complete contract with WP.

@@ -24,10 +24,18 @@ Register as plug-in using these commands (Ubuntu):
 ```dune build @install && dune install```
 
 * Execution:  
-Run the plugin on file test.c as: 
+Run the plugin on one C translation unit, such as `test.c`, as:
 ```frama-c -saida -saida-tricera-path <path-to-tricera> test.c```  
 where path-to-tricera is the path to the TriCera executable (tri). If no path is
-provided, the plugin will use `tri` in `$PATH`.
+provided, the plugin will use `tri` in `$PATH`. Included headers are processed
+normally, but Saida rejects invocations with zero input files or more than one
+input C source file. Cross-translation-unit inference is not supported; the one
+input translation unit must contain the functions Saida is expected to analyze.
+
+TriCera options supplied through `-saida-tricera-opts` are split into an argument
+vector; shell expansion is not performed. Quotes may be used to keep spaces inside
+one option value. Source, executable, and output paths may contain spaces or shell
+metacharacters.
 
 * Lib-entry option:  
 Optionally, use the Frama-C lib-entry option to non-deterministically assign all global
@@ -69,14 +77,24 @@ The plugin is currently limited to programs/specifications following these rules
 * Partial support for arrays and stack pointers.
 * Heap pointers are generally supported (but bugs exist in some cases in the translation to ACSL).
 * Does not support inference of contracts for functions with local static variables.
-* In the ACSL contract, only ensures, requires, and supported behavior-assumes clauses over C expressions are supported,
-  with the exception of certain uses of quantification: universal quantification is supported in
-  the post-conditions, and existential quantification in the pre-condition. Other types of ACSL
-  built-in or user defined constructs, such as logical functions and predicates, are not supported.
-* Function behaviors with supported C-expression clauses are translated by keeping the default
-  precondition as a harness assumption and guarding each named behavior's postconditions with its
-  pre-state `assumes` and `requires`. Behavior-specific `assigns`, `complete`, and `disjoint` clauses
-  are rejected with an explicit diagnostic instead of being silently omitted. Function-level
-  `assigns` clauses remain outside the generated harness assertions.
+* In the ACSL contract, only ensures, requires, and supported behavior-assumes clauses over C expressions are supported.
+  Universal quantification is supported only in postconditions. Universal preconditions and
+  behavior assumptions are rejected with `SAIDA-E004`; existential quantification is rejected in
+  every clause position with `SAIDA-E001`. Saida does not approximate unsupported quantifiers.
+  Other types of ACSL built-in or user-defined constructs, such as logical functions and
+  predicates, are not supported.
+* Function behaviors with supported C-expression clauses preserve their ACSL roles: a named
+  behavior's `assumes` guards its postconditions, while `assumes ==> requires` constrains valid
+  harness inputs after `complete` and `disjoint` have been checked under the function's main
+  preconditions. `complete` declarations become pre-call coverage assertions and `disjoint`
+  declarations become pre-call pairwise-exclusion assertions; neither is assumed by the harness,
+  and Saida accepts them only when TriCera reports that the resulting harness is safe.
+* `check` and `admit` requires/ensures are rejected before inference because the current TriCera
+  harness does not preserve their distinct proof semantics.
+* Function-level `assigns` clauses are preserved and reported as `SAIDA-W001` because Saida does
+  not encode their frame semantics in the inference harness. The complete generated contract must
+  therefore be checked by downstream WP. Behavior-specific `assigns` clauses are rejected.
+  Allocation clauses, `terminates`/`decreases` clauses, extended clauses, and non-normal
+  postconditions are also rejected rather than silently omitted.
   
 Aside from the limitations listed above, many more limitations/bugs expected to exist.  

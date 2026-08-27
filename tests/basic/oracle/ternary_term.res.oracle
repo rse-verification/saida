@@ -1,1 +1,3 @@
 [kernel] Parsing ternary_term.c (with preprocessing)
+[saida] User Error: TriCera reported UNSAFE while inferring contracts for harness saida_harness_main
+[kernel] Plug-in saida aborted: invalid user input.

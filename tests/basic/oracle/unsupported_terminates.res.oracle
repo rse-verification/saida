@@ -1,0 +1,3 @@
+[kernel] Parsing unsupported_terminates.c (with preprocessing)
+[saida] User Error: Unsupported terminates clause in the contract of entry
+[kernel] Plug-in saida aborted: invalid user input.

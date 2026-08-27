@@ -2,7 +2,7 @@
  (name Saida)
  (public_name frama-c-saida.core)
  (flags -open Frama_c_kernel :standard -w -50-6-27-39-36)
- (libraries frama-c.kernel))
+ (libraries frama-c.kernel unix))
 
 (plugin
  (optional)
