@@ -36,7 +36,7 @@ let get_fn_name s =
 *)
 let line_to_fun_def fn_list n =
     List.find_opt
-      (fun (name, (start_pos, end_pos)) -> n == start_pos.Filepath.pos_lnum)
+      (fun (name, (start_pos, end_pos)) -> n = (Filepos.line start_pos))
       fn_list
 
 (*Checks if line nr n is start of a fun definition*)
