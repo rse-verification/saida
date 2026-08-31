@@ -81,8 +81,14 @@ The plugin is currently limited to programs/specifications following these rules
   Universal quantification is supported only in postconditions. Universal preconditions and
   behavior assumptions are rejected with `SAIDA-E004`; existential quantification is rejected in
   every clause position with `SAIDA-E001`. Saida does not approximate unsupported quantifiers.
-  User-defined predicates remain unsupported. Saida supports a deliberately small, pure subset
-  of term-valued ACSL logic functions: mathematical-integer formals and result; integer literals;
+  Saida supports a deliberately small, pure subset of user-defined predicates: direct,
+  non-recursive comparisons between mathematical-integer formals, exact signed C `int` values,
+  `\\result`, and C-`int`-representable decimal literals, combined with `!`, `&&`, and `||`.
+  Predicate expansion is performed in the typed ACSL AST for behavior `assumes`, `requires`, and
+  `ensures`. Predicates involving labels, memory, fields, indexes, globals, casts, arithmetic,
+  quantifiers, recursion, or logic-function calls are rejected with `SAIDA-E001`.
+  Saida also supports a deliberately small, pure subset of term-valued ACSL logic functions:
+  mathematical-integer formals and result; integer literals;
   direct formal references; unary negation; and `+`, `-`, or `*`. Applications may use direct
   signed C `int` values, `\\result`, or one `\\old` wrapper. The reducer requires TriCera's
   mathematical arithmetic mode (the default, or `-arithMode:math`) and expands the definition in

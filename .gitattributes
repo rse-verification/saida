@@ -1,0 +1,2 @@
+# Frama-C emits this diagnostic marker with a terminal space; preserve the exact Ptest oracle.
+tests/basic/oracle/predicate_global_state.res.oracle whitespace=-trailing-space

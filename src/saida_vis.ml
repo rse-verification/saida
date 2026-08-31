@@ -800,6 +800,7 @@ let predicate_quantifiers predicate =
 
 
 let make_harness_func fdec spec =
+  let spec = Predicate_expansion.expand_specification spec in
   let spec = LogicFunctionReducer.reduce_specification spec in
   let behavs = spec.spec_behavior in
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 

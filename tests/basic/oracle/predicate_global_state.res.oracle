@@ -1,0 +1,4 @@
+[kernel] Parsing predicate_global_state.c (with preprocessing)
+[saida] predicate_global_state.c:11: User Error: 
+  SAIDA-E001: cannot expand predicate 'above_floor' at predicate_global_state.c:10: reads global C variable 'floor_value'; supported definitions use only direct comparisons between mathematical-integer formals, exact signed C int parameters/results, and unsuffixed decimal C-int-representable literals, joined by !, &&, or ||
+[kernel] Plug-in saida aborted: invalid user input.

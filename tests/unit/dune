@@ -8,3 +8,10 @@
  (deps logic_function_behavior_fixture.c)
  (action
   (run %{test} %{dep:logic_function_behavior_fixture.c})))
+
+(test
+ (name predicate_behavior_tests)
+ (libraries frama-c-saida.core frama-c.init.cmdline)
+ (deps predicate_behavior_fixture.c)
+ (action
+  (run %{test} %{dep:predicate_behavior_fixture.c})))
