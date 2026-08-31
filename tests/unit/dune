@@ -1,3 +1,10 @@
 (test
  (name result_validation_tests)
  (libraries frama-c-saida.core frama-c.init.cmdline unix))
+
+(test
+ (name logic_function_behavior_tests)
+ (libraries frama-c-saida.core frama-c.init.cmdline)
+ (deps logic_function_behavior_fixture.c)
+ (action
+  (run %{test} %{dep:logic_function_behavior_fixture.c})))

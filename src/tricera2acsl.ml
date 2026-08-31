@@ -161,6 +161,28 @@ let split_command_line input =
   in
   parse 0 Unquoted
 
+let arithmetic_mode_prefix = "-arithMode:"
+
+let starts_with prefix value =
+  let prefix_length = String.length prefix in
+  String.length value >= prefix_length
+  && String.sub value 0 prefix_length = prefix
+
+let is_arithmetic_mode_argument argument =
+  String.equal argument "-arithMode"
+  || starts_with arithmetic_mode_prefix argument
+
+let validate_mathematical_arithmetic input =
+  match split_command_line input with
+  | Error message -> Error message
+  | Ok arguments ->
+    let modes = List.filter is_arithmetic_mode_argument arguments in
+    match modes with
+    | [] | ["-arithMode:math"] -> Ok ()
+    | _ ->
+      Error
+        "logic-function reduction requires TriCera mathematical arithmetic; omit '-arithMode' or pass exactly one '-arithMode:math'"
+
 let process_status_code = function
   | Unix.WEXITED code -> code
   | Unix.WSIGNALED signal

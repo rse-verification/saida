@@ -26,6 +26,69 @@ open Options_saida
 (*This is a dirty fix for replacing ghost assigns, TODO: fix this properly later*)
 let ghost_regex = Str.regexp ".*//@ ghost"
 
+type logic_symbol_declaration =
+  | NotLogicSymbolDeclaration
+  | LogicSymbolLine of string
+  | LogicSymbolBlock of string * string option
+
+let starts_at source index token =
+  let token_length = String.length token in
+  index + token_length <= String.length source
+  && String.sub source index token_length = token
+
+let rec skip_horizontal_whitespace source index =
+  if index < String.length source then
+    match source.[index] with
+    | ' ' | '\t' -> skip_horizontal_whitespace source (index + 1)
+    | _ -> index
+  else index
+
+let is_identifier_character = function
+  | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> true
+  | _ -> false
+
+let starts_declaration_keyword source index keyword =
+  let keyword_end = index + String.length keyword in
+  starts_at source index keyword
+  && (keyword_end = String.length source
+      || not (is_identifier_character source.[keyword_end]))
+
+let starts_logic_symbol_declaration source index =
+  starts_declaration_keyword source index "logic"
+  || starts_declaration_keyword source index "predicate"
+
+let rec find_block_comment_end source index =
+  if index + 1 >= String.length source then None
+  else if source.[index] = '*' && source.[index + 1] = '/' then
+    Some (index + 2)
+  else find_block_comment_end source (index + 1)
+
+let classify_logic_symbol_declaration source =
+  let declaration_start = skip_horizontal_whitespace source 0 in
+  let prefix = String.sub source 0 declaration_start in
+  if starts_at source declaration_start "/*@" then
+    let body_start =
+      skip_horizontal_whitespace source (declaration_start + 3)
+    in
+    if starts_logic_symbol_declaration source body_start then
+      match find_block_comment_end source body_start with
+      | Some suffix_start ->
+        let suffix =
+          String.sub source suffix_start
+            (String.length source - suffix_start)
+        in
+        LogicSymbolBlock (prefix, Some suffix)
+      | None -> LogicSymbolBlock (prefix, None)
+    else NotLogicSymbolDeclaration
+  else if starts_at source declaration_start "//@" then
+    let body_start =
+      skip_horizontal_whitespace source (declaration_start + 3)
+    in
+    if starts_logic_symbol_declaration source body_start then
+      LogicSymbolLine prefix
+    else NotLogicSymbolDeclaration
+  else NotLogicSymbolDeclaration
+
 let get_fn_name s =
   match Str.string_match (Str.regexp {|.* \(.+\)(.*\($\|).*\)|}) s 0 with
   | true -> Str.matched_group 1 s
@@ -48,41 +111,58 @@ let line_is_fun_def fn_list n =
 type acslState = 
 | AcslOutside
 | AcslInside
+| LogicSymbolInside
 
 (*fn_list : [(name, loc)]contains a list of all function definitions and locations
     where name is string and loc is Cil_types.location
 *)
+(* Remove top-level ACSL logic declarations from the generated C harness. Their
+   applications have already been reduced in the typed AST, while TriCera only
+   receives the resulting C-compatible expressions. *)
 let rec modify_acsl_annots ic oc acsl_state line fn_list =
-  let next_acsl_state cur_state str =
-    match cur_state with
-    | AcslOutside when Str.string_match acsl_start_regex str 0 -> AcslInside
-    | AcslInside when  Str.string_match acsl_end_regex str 0 -> AcslOutside
-    | _ -> cur_state
-  in
-  match (try_read ic) with
+  match try_read ic with
   | None -> ()
   | Some src_line ->
-      let s' = String.trim src_line in
-      let acsl_state' = next_acsl_state acsl_state s' in
-      let mod_src_line =
-        match (acsl_state, acsl_state') with
-        | (AcslInside, AcslOutside) -> "\n"
-        | (AcslInside, AcslInside) -> ""
-        | (AcslOutside, AcslInside) -> ""
-        | (AcslOutside, AcslOutside) when line_is_fun_def fn_list line ->
-            (match get_fn_name s' with
-             | name when name = Kernel.MainFunction.get () -> src_line ^ "\n"
-             | name -> "/*@contract@*/\n" ^ src_line ^ "\n")
-        | (AcslOutside, AcslOutside) ->
-            if (Str.string_match ghost_regex src_line 0) then
-              (* Obvioulsy this will only work for single line comments. 
-                 If e.g. ghost variable declarations are multi-line, this will fail. *)
-              (Str.replace_first (Str.regexp "//@ ghost") "" src_line) ^ " //from ghost code\n"
-            else src_line^"\n"
-      in
-      output_string oc mod_src_line;
-      modify_acsl_annots ic oc acsl_state' (line+1) fn_list
-
+    let s' = String.trim src_line in
+    let starts_acsl = Str.string_match acsl_start_regex s' 0 in
+    let ends_acsl = Str.string_match acsl_end_regex s' 0 in
+    let acsl_state', mod_src_line =
+      match acsl_state with
+      | LogicSymbolInside ->
+        (match find_block_comment_end src_line 0 with
+         | None -> LogicSymbolInside, "\n"
+         | Some suffix_start ->
+           let suffix =
+             String.sub src_line suffix_start
+               (String.length src_line - suffix_start)
+           in
+           AcslOutside, suffix ^ "\n")
+      | AcslOutside ->
+        (match classify_logic_symbol_declaration src_line with
+         | LogicSymbolLine prefix -> AcslOutside, prefix ^ "\n"
+         | LogicSymbolBlock (prefix, None) ->
+           LogicSymbolInside, prefix ^ "\n"
+         | LogicSymbolBlock (prefix, Some suffix) ->
+           AcslOutside, prefix ^ suffix ^ "\n"
+         | NotLogicSymbolDeclaration when starts_acsl && ends_acsl ->
+           AcslOutside, "\n"
+         | NotLogicSymbolDeclaration when starts_acsl -> AcslInside, ""
+         | NotLogicSymbolDeclaration when line_is_fun_def fn_list line ->
+           (match get_fn_name s' with
+            | name when name = Kernel.MainFunction.get () ->
+              AcslOutside, src_line ^ "\n"
+            | _ -> AcslOutside, "/*@contract@*/\n" ^ src_line ^ "\n")
+         | NotLogicSymbolDeclaration ->
+           if Str.string_match ghost_regex src_line 0 then
+             AcslOutside,
+             Str.replace_first (Str.regexp "//@ ghost") "" src_line
+             ^ " //from ghost code\n"
+           else AcslOutside, src_line ^ "\n")
+      | AcslInside when ends_acsl -> AcslOutside, "\n"
+      | AcslInside -> AcslInside, ""
+    in
+    output_string oc mod_src_line;
+    modify_acsl_annots ic oc acsl_state' (line + 1) fn_list
 
 
 (*Takes buffer for the harness function and the original file name and merges*)

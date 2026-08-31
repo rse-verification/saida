@@ -82,6 +82,275 @@ let term_node_debug_print out tn =
         | Tlet (_,_) -> Format.fprintf out "29" (** local binding *)
 
 
+(* Reduce a small, value-only subset of logic functions before the harness is
+   printed. Keeping this in the typed ACSL AST avoids source-text substitution. *)
+module LogicFunctionReducer = struct
+  let error_code = "SAIDA-E001"
+
+  let abort logic_name reason =
+    Options_saida.Self.abort
+      "[%s] Cannot safely reduce ACSL logic function '%s': %s"
+      error_code logic_name reason
+
+  let is_logic_integer = function
+    | Linteger -> true
+    | _ -> false
+
+  let ensure_mathematical_arithmetic logic_name =
+    match
+      Tricera2acsl.validate_mathematical_arithmetic
+        (Options_saida.TriceraOptions.get ())
+    with
+    | Ok () -> ()
+    | Error reason -> abort logic_name reason
+
+  let has_attribute name attributes =
+    Ast_attributes.contains name attributes
+
+  let unsupported_int_qualifier typ attributes =
+    if Ast_types.has_qualifier "volatile" typ
+       || has_attribute "volatile" attributes
+    then Some "is volatile-qualified"
+    else if Ast_types.has_attribute "atomic" typ
+            || has_attribute "atomic" attributes
+    then Some "is atomic-qualified"
+    else None
+
+  let validate_plain_signed_c_int typ attributes =
+    match unsupported_int_qualifier typ attributes with
+    | Some reason -> Error reason
+    | None ->
+      match typ.tnode with
+      | TInt IInt -> Ok ()
+      | _ ->
+        Error
+          "is not a direct signed C int value with an exact lift to ACSL integer"
+
+  let same_logic_var left right = left.lv_id = right.lv_id
+
+  let find_actual bindings logic_var =
+    bindings
+    |> List.find_opt (fun (formal, _) -> same_logic_var formal logic_var)
+    |> Option.map snd
+
+  let is_formal formals logic_var =
+    List.exists (same_logic_var logic_var) formals
+
+  let builtin_label_name = function
+    | Here -> "Here"
+    | Old -> "Old"
+    | Pre -> "Pre"
+    | Post -> "Post"
+    | LoopEntry -> "LoopEntry"
+    | LoopCurrent -> "LoopCurrent"
+    | Init -> "Init"
+
+  let rec validate_direct_signed_int_actual ?(old_allowed = true) term =
+    match term.term_node with
+    | Tat (inner, BuiltinLabel Old) when old_allowed ->
+        validate_direct_signed_int_actual ~old_allowed:false inner
+    | Tat (_, BuiltinLabel Old) ->
+        Error
+          "uses nested or repeated builtin label 'Old'; at most one 'Old' wrapper is supported"
+    | Tat (_, BuiltinLabel label) ->
+        Error
+          (Format.asprintf
+             "uses unsupported builtin label '%s'; only 'Old' is supported"
+             (builtin_label_name label))
+    | Tat (_, StmtLabel _) ->
+        Error
+          "uses a statement/custom label; only builtin label 'Old' is supported"
+    | Tat (_, FormalLabel label) ->
+        Error
+          (Format.asprintf
+             "uses unsupported formal label '%s'; only builtin label 'Old' is supported"
+             label)
+    | TCast (true, Linteger, inner) ->
+        validate_direct_signed_int_actual ~old_allowed inner
+    | TLval (TVar logic_var, TNoOffset) ->
+        (match logic_var.lv_origin with
+         | Some varinfo ->
+             validate_plain_signed_c_int varinfo.vtype varinfo.vattr
+         | _ ->
+             Error
+               "is not a direct signed C int value with an exact lift to ACSL integer")
+    | TLval (TResult typ, TNoOffset) ->
+        validate_plain_signed_c_int typ []
+    | _ ->
+        Error
+          "is not a direct signed C int value with an exact lift to ACSL integer"
+
+  let lift_actual_to_logic_integer actual =
+    if is_logic_integer actual.term_type then actual
+    else
+      { actual with
+        term_node = TCast (true, Linteger, actual);
+        term_type = Linteger }
+
+  let describe_logic_body = function
+    | LBnone -> "it is declared without a definitional body"
+    | LBreads _ -> "it has only a reads clause, not a definitional body"
+    | LBterm _ -> "it has a term body"
+    | LBpred _ -> "it defines a predicate rather than a term"
+    | LBinductive _ -> "it has an inductive definition"
+
+  let rec substitute_body logic_info bindings term =
+    let logic_name = logic_info.l_var_info.lv_name in
+    let require_logic_integer child =
+      if not (is_logic_integer child.term_type) then
+        abort logic_name
+          "its definition mixes mathematical integers with a C, enum, unsigned, real, or other unsupported type"
+    in
+    let substitute = substitute_body logic_info bindings in
+    (match term.term_node with
+     | TCast _ ->
+         abort logic_name
+           "its definition contains a cast; narrowing, signedness-changing, and mixed C/logic casts are outside the semantics-preserving subset"
+     | _ -> ());
+    require_logic_integer term;
+    match term.term_node with
+    | TConst (Integer _ as constant) ->
+        { term with term_node = TConst constant }
+    | TLval (TVar logic_var, TNoOffset) ->
+        (match find_actual bindings logic_var with
+         | Some actual -> actual
+         | None ->
+             abort logic_name
+               (Format.asprintf
+                  "its body reads non-formal logic variable '%s'"
+                  logic_var.lv_name))
+    | TLval (TVar logic_var, _)
+      when is_formal logic_info.l_profile logic_var ->
+        abort logic_name
+          (Format.asprintf
+             "formal parameter '%s' is used with an array or field offset"
+             logic_var.lv_name)
+    | TUnOp (Neg, child) ->
+        require_logic_integer child;
+        { term with term_node = TUnOp (Neg, substitute child) }
+    | TBinOp ((PlusA | MinusA | Mult as operator), left, right) ->
+        require_logic_integer left;
+        require_logic_integer right;
+        { term with
+          term_node = TBinOp (operator, substitute left, substitute right) }
+    | Tapp (nested, _, _) ->
+        if nested.l_var_info.lv_id = logic_info.l_var_info.lv_id then
+          abort logic_name "its body is recursive"
+        else
+          abort logic_name
+            (Format.asprintf
+               "its body calls logic function '%s'"
+               nested.l_var_info.lv_name)
+    | TBinOp _ ->
+        abort logic_name
+          "its body uses a binary operator other than +, -, or *"
+    | TUnOp _ ->
+        abort logic_name "its body uses a unary operator other than unary -"
+    | TConst _ ->
+        abort logic_name "its definition contains a non-integer constant"
+    | TLval _ ->
+        abort logic_name "its body reads memory or a non-formal lvalue"
+    | _ ->
+        abort logic_name
+          (Format.asprintf
+             "its body contains unsupported term form %a"
+             term_node_debug_print term.term_node)
+
+  let reduce_application application logic_info labels arguments =
+    let logic_name = logic_info.l_var_info.lv_name in
+    ensure_mathematical_arithmetic logic_name;
+    if logic_info.l_labels <> [] then
+      abort logic_name "its definition declares one or more formal state labels";
+    if labels <> [] then
+      abort logic_name "its application supplies one or more state labels";
+    if logic_info.l_tparams <> [] then
+      abort logic_name "it has one or more logic type parameters";
+    (match logic_info.l_type with
+     | Some Linteger -> ()
+     | Some _ ->
+         abort logic_name
+           "its result type is not the unbounded ACSL mathematical integer type"
+     | None -> abort logic_name "it is a predicate, not a term-valued function");
+    if not (List.for_all (fun formal -> is_logic_integer formal.lv_type)
+              logic_info.l_profile)
+    then
+      abort logic_name
+        "one or more formal parameters are not unbounded ACSL mathematical integers";
+    if not (List.for_all (fun formal -> formal.lv_kind = LVFormal)
+              logic_info.l_profile)
+    then abort logic_name "its profile contains a non-formal parameter";
+    if List.length logic_info.l_profile <> List.length arguments then
+      abort logic_name
+        (Format.asprintf
+           "the application has %d arguments but its definition has %d formals"
+           (List.length arguments) (List.length logic_info.l_profile));
+    List.iteri
+      (fun index argument ->
+        match validate_direct_signed_int_actual argument with
+        | Ok () -> ()
+        | Error reason ->
+            abort logic_name
+              (Format.asprintf "application argument %d %s" (index + 1) reason))
+      arguments;
+    match logic_info.l_body with
+    | LBterm body ->
+        let bindings =
+          List.combine logic_info.l_profile
+            (List.map lift_actual_to_logic_integer arguments)
+        in
+        let reduced = substitute_body logic_info bindings body in
+        { reduced with
+          term_loc = application.term_loc;
+          term_name = application.term_name }
+    | unsupported_body ->
+        abort logic_name (describe_logic_body unsupported_body)
+
+  class application_reducer = object
+    inherit Visitor.frama_c_inplace
+
+    method! vterm term =
+      match term.term_node with
+      | Tapp _ ->
+          Cil.DoChildrenPost
+            (fun visited_term ->
+              match visited_term.term_node with
+              | Tapp (logic_info, labels, arguments) ->
+                  reduce_application visited_term logic_info labels arguments
+              | _ -> assert false)
+      | _ -> Cil.DoChildren
+
+    method! vpredicate_node = function
+      | Papp (logic_info, _, _) ->
+          abort logic_info.l_var_info.lv_name
+            "it is used as a predicate; predicate definitions are outside this reduction"
+      | _ -> Cil.DoChildren
+  end
+
+  let reduce_predicate predicate =
+    let visitor = new application_reducer in
+    Cil.visitCilPredicate (visitor :> Cil.cilVisitor) predicate
+
+  let reduce_identified_predicate identified =
+    let content = identified.ip_content in
+    { identified with
+      ip_content =
+        { content with
+          tp_statement = reduce_predicate content.tp_statement } }
+
+  let reduce_behavior behavior =
+    { behavior with
+      b_assumes = List.map reduce_identified_predicate behavior.b_assumes;
+      b_requires = List.map reduce_identified_predicate behavior.b_requires;
+      b_post_cond =
+        List.map
+          (fun (kind, predicate) ->
+            kind, reduce_identified_predicate predicate)
+          behavior.b_post_cond }
+
+  let reduce_specification spec =
+    { spec with spec_behavior = List.map reduce_behavior spec.spec_behavior }
+end
+
 (* Printer extension to print pre/post conditions etc. in TriCera format. *)
 module HarnessPrinter = struct
   open Printer
@@ -510,6 +779,7 @@ let predicate_quantifiers predicate =
 
 
 let make_harness_func fdec spec =
+  let spec = LogicFunctionReducer.reduce_specification spec in
   let behavs = spec.spec_behavior in
   let get_logic_vars (predicates: identified_predicate list): logic_var list = 
     predicates
