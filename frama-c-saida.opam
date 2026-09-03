@@ -5,15 +5,15 @@ synopsis: "ACSL contract inference for helper functions"
 description: """
 This plugin for the Frama-C platform for source code analysis
 of C programs provides inference of ACSL contracts for helper functions."""
-maintainer: ["Ola Wingbrant" "Jesper Amilon"]
+maintainer: ["Jesper Amilon"]
 authors: ["The Saida development team"]
 license: "GPL-2.0-or-later"
 homepage: "https://github.com/rse-verification/saida"
 bug-reports: "https://github.com/rse-verification/saida/issues"
 depends: [
-  "dune" {>= "3.2"}
-  "ocaml" {>= "4.14.1"}
-  "frama-c" {= "33.0"}
+  "dune" {>= "3.13"}
+  "ocaml" {>= "5.4"}
+  "frama-c" {>= "33" & < "34"}
   "odoc" {with-doc}
 ]
 build: [

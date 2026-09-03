@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - '**'
-  workflow_dispatch:
 
 permissions: read-all
 
@@ -19,24 +18,22 @@ jobs:
         os:
           - ubuntu-latest
         ocaml-compiler:
-          - "4.14.1"
+          - "5.4"
+          - "5.5"
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout tree
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - run: |
-          sudo apt-get update
-          opam --cli=2.1 install . --deps-only --with-test
-          opam --cli=2.1 exec -- frama-c-ptests
-          opam --cli=2.1 exec -- dune build @install
-          # Currently we can't run ptests because they depend on tricera,
-          # which is not installed in the CI.
-          # opam --cli=2.1 exec -- dune build @ptests
-          opam --cli=2.1 exec -- dune runtest
+          opam install . --deps-only
+          opam exec -- why3 config detect
+          opam exec -- dune build
+          opam exec -- dune test
+          opam exec -- dune install

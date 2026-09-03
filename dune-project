@@ -1,11 +1,11 @@
-(lang dune 3.2)
+(lang dune 3.13)
 (using dune_site 0.1)
 (name frama-c-saida)
 
 (generate_opam_files true)
 
 (license GPL-2.0-or-later)
-(maintainers "Ola Wingbrant" "Jesper Amilon")
+(maintainers "Jesper Amilon")
 (authors "The Saida development team")
 (source (github rse-verification/saida))
 (homepage "https://github.com/rse-verification/saida")
@@ -14,8 +14,8 @@
 (package 
   (name frama-c-saida)
  (depends
-  (ocaml (>= 4.14.1))
-  (frama-c (= 31.0)))
+  (ocaml (>= 5.4))
+  (frama-c (and (>= 33) (< 34))))
  (synopsis "ACSL contract inference for helper functions")
  (description "This plugin for the Frama-C platform for source code analysis
 of C programs provides inference of ACSL contracts for helper functions."))
