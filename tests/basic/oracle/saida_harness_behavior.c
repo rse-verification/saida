@@ -5,8 +5,7 @@
 */
 
 /*
-  Tests translation of behavior clauses. 
-  TODO: Not supported yet.
+  Tests translation of behavior clauses with distinct pre-state assumptions.
 */
 
 int g_x;
@@ -24,7 +23,7 @@ int step_towards_0(int x) {
 
 /*
   The above contract should be translated like the equivalent
-  one below, but it currently is not.
+  one below.
 
   assigns g_x;
   ensures 
@@ -44,9 +43,9 @@ int saida_harness_main_inner()
   int main_result = main();
   
   //The ensures-clauses translated into asserts
-  assert(g_x == 0);
-  assert(g_x == $at("Old", (int)(g_x)) + 1);
-  assert(g_x == $at("Old", (int)(g_x)) - 1);
+  assert(!$at("Old", (int)(g_x == 0)) || g_x == 0);
+  assert(!$at("Old", (int)(g_x < 0)) || g_x == $at("Old", (int)(g_x)) + 1);
+  assert(!$at("Old", (int)(g_x > 0)) || g_x == $at("Old", (int)(g_x)) - 1);
   
 }
 void saida_harness_main()
