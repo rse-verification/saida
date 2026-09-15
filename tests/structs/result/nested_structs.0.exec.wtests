@@ -1,0 +1,11 @@
+{
+  "dir": "tests/structs/result",
+  "info": "TEST #0 OF TEST FILE tests/structs/nested_structs.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=nested_structs.out.c > \"nested_structs.0.res.log\" 2> \"nested_structs.0.err.log\"",
+  "out": "nested_structs.0.res.log",
+  "err": "nested_structs.0.err.log",
+  "log": [ "nested_structs.out.c", "saida_harness_nested_structs.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/nested_structs.0.res.oracle",
+  "oracle_err": "../oracle/nested_structs.0.err.oracle"
+}

@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/behavior.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    behavior.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=behavior.out.c > \"behavior.0.res.log\" 2> \"behavior.0.err.log\"",
+  "out": "behavior.0.res.log",
+  "err": "behavior.0.err.log",
+  "log": [ "behavior.out.c", "saida_harness_behavior.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/behavior.0.res.oracle",
+  "oracle_err": "../oracle/behavior.0.err.oracle"
+}
