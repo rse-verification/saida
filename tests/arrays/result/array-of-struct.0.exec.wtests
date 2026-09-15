@@ -1,0 +1,11 @@
+{
+  "dir": "tests/arrays/result",
+  "info": "TEST #0 OF TEST FILE tests/arrays/array-of-struct.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c > \"array-of-struct.0.res.log\" 2> \"array-of-struct.0.err.log\"",
+  "out": "array-of-struct.0.res.log",
+  "err": "array-of-struct.0.err.log",
+  "log": [ "array-of-struct.out.c", "saida_harness_array-of-struct.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/array-of-struct.0.res.oracle",
+  "oracle_err": "../oracle/array-of-struct.0.err.oracle"
+}

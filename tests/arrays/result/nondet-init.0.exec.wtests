@@ -1,0 +1,11 @@
+{
+  "dir": "tests/arrays/result",
+  "info": "TEST #0 OF TEST FILE tests/arrays/nondet-init.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    nondet-init.c -lib-entry -main=func -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=nondet-init.out.c > \"nondet-init.0.res.log\" 2> \"nondet-init.0.err.log\"",
+  "out": "nondet-init.0.res.log",
+  "err": "nondet-init.0.err.log",
+  "log": [ "nondet-init.out.c", "saida_harness_nondet-init.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/nondet-init.0.res.oracle",
+  "oracle_err": "../oracle/nondet-init.0.err.oracle"
+}
