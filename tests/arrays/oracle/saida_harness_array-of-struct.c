@@ -6,6 +6,9 @@
 /*
   Tests that access of struct member values of array elements
   in ensures clauses is handled correctly.
+
+  TODO: TriCera v0.5 does not reconstruct the result relation for this case;
+  the oracle records that current limitation.
  */
 
 struct S {

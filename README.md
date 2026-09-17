@@ -55,6 +55,7 @@ Step 5: (optional) Run the wp plugin on the result from step 4
 
 A suitable development environment for the plugin is provided by the
 [AutoDeduct toolchain docker image](https://github.com/rse-verification/auto-deduct-toolchain).
+The ptest oracles are baselined against the released TriCera v0.5 executable.
 
 Please note that there are several `TODO` and `FIX ME` sprinkled around the code base.
 There are several test cases with `TODO` to indicate that their oracle file contains

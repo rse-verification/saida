@@ -6,6 +6,9 @@
 /*
   Tests harness generation for nested structs in requires/ensures
   clauses is handled correctly.
+
+  TODO: TriCera v0.5 reconstructs only a trivial helper postcondition for
+  this mixed struct/pointer case; the oracle records that limitation.
  */
 
 struct Si {
