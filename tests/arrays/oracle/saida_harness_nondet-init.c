@@ -5,6 +5,9 @@
 */
 /*
   Tests that nondeterministically initialized arrays are translated correctly.
+
+  TODO: TriCera v0.5 does not reconstruct the updated array element;
+  the oracle records that current limitation.
  */
 int a[3];
 

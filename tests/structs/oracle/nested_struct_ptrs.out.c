@@ -23,7 +23,7 @@ struct So outer = { &inner };
 struct So *p = &outer;
 
 /*@
-  requires \true;
+  requires \valid(s);
   ensures inner == \old(inner);
 */
 int select_inner_x(struct So *s) {

@@ -1,11 +1,13 @@
 /* run.config
    LOG: @PTEST_NAME@.out.c
    LOG: saida_harness_@PTEST_NAME@.c
-   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
+   OPT: -lib-entry -saida -saida-tricera-opts="-acsl -solutionReconstruction:wp" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
   Tests harness generation for nested structs in requires/ensures
-  clauses is handled correctly.
+  clauses is handled correctly. TriCera's default reconstruction emits an
+  invalid aggregate expression for this case, while its supported WP
+  reconstruction produces valid ACSL.
  */
 
 struct Si {

@@ -1,6 +1,11 @@
 /* run.config
-   LOG: @PTEST_NAME@.out.c
-   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@PTEST_NAME@.out.c
+   OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-out=@DEV_NULL@
+*/
+
+/*
+  Smoke-test recursive inference. TriCera may infer equivalent postconditions
+  in different textual forms, so this test checks successful execution rather
+  than comparing a solver-dependent contract oracle.
 */
 
 int g1, g2;

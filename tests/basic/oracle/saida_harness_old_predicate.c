@@ -4,7 +4,9 @@
    OPT: -lib-entry -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \old predicates are translated correctly.
+  This test checks that \old predicates are translated into a
+  TriCera-parsable harness. Its entry-point postcondition follows directly
+  from the precondition, so it does not constrain the helper result.
  */
  
 int g;

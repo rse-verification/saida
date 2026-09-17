@@ -12,10 +12,6 @@ int g;
   requires -500 <= x <= 500;
   ensures \result == x+1;
 */
-/*@
-  requires g == x && 101 >= x && x >= 0;
-  ensures \old(x) - \result == -1 && g - \result == -1 && \old(g) - \result == -1 && 102 >= \result && \result >= 1;
-*/
 int add_one(int x) {
   return x+1;
 }

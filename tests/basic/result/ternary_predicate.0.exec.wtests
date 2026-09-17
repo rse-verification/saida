@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/ternary_predicate.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    ternary_predicate.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=ternary_predicate.out.c > \"ternary_predicate.0.res.log\" 2> \"ternary_predicate.0.err.log\"",
+  "out": "ternary_predicate.0.res.log",
+  "err": "ternary_predicate.0.err.log",
+  "log": [ "ternary_predicate.out.c", "saida_harness_ternary_predicate.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/ternary_predicate.0.res.oracle",
+  "oracle_err": "../oracle/ternary_predicate.0.err.oracle"
+}
