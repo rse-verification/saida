@@ -38,4 +38,4 @@ jobs:
           opam exec -- why3 config detect
           opam exec -- dune build
           opam exec -- dune install
-          opam exec -- dune test
+          opam exec -- dune test -j 1
