@@ -35,7 +35,8 @@ jobs:
           opam repo add rse-verification https://rse-verification.github.io/opam
           opam install tricera.0.5 --yes
           opam install . --deps-only
+          export TRI_PP_PATH="$(opam var bin)"
           opam exec -- why3 config detect
           opam exec -- dune build
           opam exec -- dune install
-          opam exec -- dune test -j 1
+          opam exec -- dune test
