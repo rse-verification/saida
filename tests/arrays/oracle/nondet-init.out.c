@@ -9,8 +9,8 @@
 int a[3];
 
 /*@
-  requires n == 1 && a == x && \valid(x);
-  ensures \old(n) == 1 && \old(a) == \old(x) && a == \old(x) && \valid(x);
+  requires n == 1;
+  ensures \old(n) == 1 && a == \old(a);
 */
 void increment(int x[], unsigned n) {
   x[n] += 1;

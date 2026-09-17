@@ -56,6 +56,11 @@ Step 5: (optional) Run the wp plugin on the result from step 4
 A suitable development environment for the plugin is provided by the
 [AutoDeduct toolchain docker image](https://github.com/rse-verification/auto-deduct-toolchain).
 
+The snapshot ptests exercise TriCera revision
+`5c15dbc552c42a86274bacce7d0e46fcd698cf7a`, which CI builds from source.
+To reproduce them locally, build that checkout with `sbt assembly`, put its
+directory before other entries in `PATH`, then run `dune test`.
+
 Please note that there are several `TODO` and `FIX ME` sprinkled around the code base.
 There are several test cases with `TODO` to indicate that their oracle file contains
 the result of an unsupported feature. 

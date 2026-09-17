@@ -31,10 +31,31 @@ jobs:
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Checkout compatible TriCera source
+        uses: actions/checkout@v6
+        with:
+          repository: uuverifiers/tricera
+          ref: 5c15dbc552c42a86274bacce7d0e46fcd698cf7a
+          path: .tricera
+
+      - name: Build TriCera
+        working-directory: .tricera
+        run: sbt assembly
+
       - run: |
           opam repo add rse-verification https://rse-verification.github.io/opam
           opam install . --deps-only
           opam exec -- why3 config detect
           opam exec -- dune build
-          opam exec -- dune test
+          PATH="$GITHUB_WORKSPACE/.tricera:$PATH" opam exec -- dune test
           opam exec -- dune install

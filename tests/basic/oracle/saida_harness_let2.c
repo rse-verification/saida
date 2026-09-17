@@ -3,8 +3,8 @@
    OPT: -lib-entry -main=f -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
 /*
-  This test makes sure that \let with pointers are translated properly. 
-  TODO: Not yet supported.
+  This test checks that \let with pointers is translated into a
+  TriCera-parsable harness. It does not claim general \let support.
 */
 int i;
 int t[10];

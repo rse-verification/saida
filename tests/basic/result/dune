@@ -1,6 +1,74 @@
 (copy_files ../*.*)
 (alias (name runtest)
   (deps (alias runtest_config)))
+; TEST FILE "sum.c"
+(alias (name "sum.wtests")
+  (deps (alias "sum.0.exec.wtests") (alias sum.0.execnow.wtests))) ; to perform all sub-tests related to a file
+(alias (name "sum.c")
+  (deps (alias "sum.0.exec") (alias sum.0.execnow.wtests))) ; to reproduce and visualize all sub-test outputs related to a file
+(rule ; TEST #0 OF TEST FILE tests/basic/sum.c
+  (alias "sum.0.exec.wtests")
+  (targets "sum.0.err.log" "sum.0.res.log" "sum.out.c")
+  (deps "sum.0.exec.wtests" "../oracle/sum.0.res.oracle" "../oracle/sum.0.err.oracle" "sum.c" (package frama-c) (package "frama-c-saida"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (run frama-c-wtests -brief "sum.0.exec.wtests" "frama-c -check -no-autoload-plugins -load-plugin=saida sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c > \"sum.0.res.log\" 2> \"sum.0.err.log\""))
+)
+(rule ; REPRODUCE TEST #0 OF TEST FILE "sum.c"
+  (alias "sum.0.exec")
+  (deps "sum.c" (package frama-c) (package "frama-c-saida") (universe))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (with-accepted-exit-codes 0 (system "frama-c -check -no-autoload-plugins -load-plugin=saida sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c")))
+)
+(rule ; SHOW TEST COMMAND #0 OF TEST FILE "sum.c"
+  (alias "sum.0.exec.show")
+  (deps "sum.c" (package frama-c) (package "frama-c-saida") (universe))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (system "echo 'frama-c -check -no-autoload-plugins -load-plugin=saida sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c > \"sum.0.res.log\" 2> \"sum.0.err.log\"'"))
+)
+(rule
+  (alias sum.0.exec.diff)
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (diff "../oracle/sum.0.res.oracle" "sum.0.res.log"))
+)
+(rule
+  (alias sum.0.exec.diff)
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (diff "../oracle/sum.0.err.oracle" "sum.0.err.log"))
+)
+(alias (name "sum.diff")
+  (deps (alias "sum.0.exec.diff"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+)
+(alias (name runtest_config)
+  (deps (alias "sum.diff"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+)
+(rule ; EXECNOW #0 OF TEST FILE tests/basic/sum.c
+  (alias sum.0.execnow.wtests)
+  (deps "../oracle/sum.parse.log" "sum.c" "sum.out.c" (package frama-c) (package "frama-c-saida"))
+  (targets "sum.parse.log")
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (run frama-c-wtests -brief %{dep:sum.0.execnow.wtests} "grep -q \"contract for sum\" sum.out.c && frama-c -check -no-autoload-plugins sum.out.c > sum.parse.log"))
+)
+(rule ; SHOW EXECNOW COMMAND #0 OF TEST FILE "sum.c"
+  (alias sum.0.execnow.show)
+  (deps "sum.c" "sum.out.c" (package frama-c) (package "frama-c-saida") (universe))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (system "echo 'grep -q \"contract for sum\" sum.out.c && frama-c -check -no-autoload-plugins sum.out.c > sum.parse.log'"))
+)
+(rule ; COMPARE TARGET #0 OF EXECNOW #0 FOR TEST FILE "sum.c"
+  (alias sum.0.execnow.diff)
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+  (action (diff "../oracle/sum.parse.log" "sum.parse.log"))
+)
+(alias (name "sum.diff")
+  (deps (alias "sum.0.execnow.diff"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+)
+(alias (name runtest_config)
+  (deps (alias "sum.diff"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+)
 ; TEST FILE "char_const.c"
 (alias (name "char_const.wtests")
   (deps (alias "char_const.0.exec.wtests"))) ; to performs all sub-tests related to a file
@@ -103,53 +171,6 @@
 )
 (alias (name "runtest_config")
   (deps (alias "behavior.diff"))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-)
-; TEST FILE "sum.c"
-(alias (name "sum.wtests")
-  (deps (alias "sum.0.exec.wtests"))) ; to performs all sub-tests related to a file
-(alias (name "sum.c")
-  (deps (alias "sum.0.exec"))) ; to reproduce and visualize the all sub-test outputs related to a file
-(rule ; TEST #0 OF TEST FILE tests/basic/sum.c
-  (alias "sum.0.exec.wtests")
-  (targets "sum.0.err.log" "sum.0.res.log"  "sum.out.c" )
-  (deps "sum.0.exec.wtests" "../oracle/sum.0.res.oracle" "../oracle/sum.0.err.oracle"  "../oracle/sum.out.c" "sum.c"  (package frama-c)  (package "frama-c-saida") )
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (run frama-c-wtests -brief "sum.0.exec.wtests" "frama-c -check -no-autoload-plugins -load-plugin=saida    sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c > \"sum.0.res.log\" 2> \"sum.0.err.log\"" ))
-)
-(rule ; COMPARE TARGET #0 OF TEST #0 FOR TEST FILE "sum.c"
-  (alias sum.0.exec.diff)
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/sum.out.c" "sum.out.c"))
-)
-(rule ; REPRODUCE TEST #0 OF TEST FILE "sum.c"
-  (alias "sum.0.exec")
-  (deps  "sum.c"  (package frama-c)  (package "frama-c-saida")  (universe))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (with-accepted-exit-codes 0 (system "frama-c -check -no-autoload-plugins -load-plugin=saida    sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c")))
-)
-(rule ; SHOW TEST COMMAND #0 OF TEST FILE "sum.c"
-  (alias "sum.0.exec.show")
-  (deps  "sum.c"  (package frama-c)  (package "frama-c-saida")  (universe))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (system "echo 'frama-c -check -no-autoload-plugins -load-plugin=saida    sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c > \"sum.0.res.log\" 2> \"sum.0.err.log\"'"))
-)
-(rule
-  (alias "sum.0.exec.diff")
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/sum.0.res.oracle" "sum.0.res.log"))
-)
-(rule
-  (alias "sum.0.exec.diff")
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/sum.0.err.oracle" "sum.0.err.log"))
-)
-(alias (name "sum.diff")
-  (deps (alias "sum.0.exec.diff"))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-)
-(alias (name "runtest_config")
-  (deps (alias "sum.diff"))
   (enabled_if (and true %{lib-available:frama-c-saida.core}))
 )
 ; TEST FILE "ternary_term.c"
@@ -718,4 +739,3 @@
                  (echo "- \%{lib-available:frama-c-saida.core}: " %{lib-available:frama-c-saida.core} "\n")
   ))
 )
-

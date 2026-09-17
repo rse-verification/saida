@@ -96,11 +96,17 @@ let source_w_harness source_fname hbuff fn_list dest_fname =
   close_out dest_chan
 
 
-let rec add_inferred_to_source ic buff ht line fn_list =
+let has_source_contract source_contracts name =
+  List.exists (String.equal name) source_contracts
+
+let rec add_inferred_to_source ic buff ht line fn_list source_contracts =
   match (try_read ic) with
     | Some s ->
       (match line_to_fun_def fn_list line with
         | Some(name, _) ->
+          (* Preserve explicit source contracts. Adjacent ACSL contracts are
+             rejected by Frama-C, and Saida must not replace a user contract. *)
+          if has_source_contract source_contracts name then () else
           (match Hashtbl.find_opt ht name with
             | Some clist ->
               List.iter (fun r -> Buffer.add_string buff (r ^ "\n")) clist;
@@ -112,7 +118,7 @@ let rec add_inferred_to_source ic buff ht line fn_list =
         | None -> ()
       );
       Buffer.add_string buff (s ^ "\n");
-      add_inferred_to_source ic buff ht (line+1) fn_list
+      add_inferred_to_source ic buff ht (line+1) fn_list source_contracts
     | None -> ()
 
 
@@ -125,12 +131,12 @@ let run_wp_plugin filename =
 
 
 
-let merge_source_w_inferred source_file fn_list result_fname out_fname =
+let merge_source_w_inferred source_file fn_list source_contracts result_fname out_fname =
   let contracts_hash = create_contracts_hash result_fname in
   let source_ic = open_in source_file in
   let n = in_channel_length source_ic in
   let buff = Buffer.create n in
-  let () = add_inferred_to_source source_ic buff contracts_hash 1 fn_list in
+  let () = add_inferred_to_source source_ic buff contracts_hash 1 fn_list source_contracts in
   let () = close_in source_ic in
   let out_chan = open_out out_fname in
   let _ = Buffer.output_buffer out_chan buff in
@@ -192,7 +198,10 @@ let run () =
           harness_func.name
           (TriceraOptions.get ())
           harness_fname result_fname);
-        merge_source_w_inferred source_fname fn_list result_fname output_fname;
+        let source_contracts =
+          List.map (fun hf -> hf.block.called_func) hf_list
+        in
+        merge_source_w_inferred source_fname fn_list source_contracts result_fname output_fname;
         if Run_wp.get () then
           let fname = output_fname
           in run_wp_plugin fname;

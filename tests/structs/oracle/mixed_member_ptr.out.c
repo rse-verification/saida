@@ -22,7 +22,7 @@ struct So s = { &inner };
 
 /*@
   requires \true;
-  ensures inner == \old(inner);
+  ensures \true;
 */
 int select_inner_x(struct So structs) {
   return structs.inner->x ;

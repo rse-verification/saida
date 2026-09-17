@@ -167,7 +167,7 @@
   (targets "nested_structs.0.err.log" "nested_structs.0.res.log"  "nested_structs.out.c" "saida_harness_nested_structs.c" )
   (deps "nested_structs.0.exec.wtests" "../oracle/nested_structs.0.res.oracle" "../oracle/nested_structs.0.err.oracle"  "../oracle/nested_structs.out.c" "../oracle/saida_harness_nested_structs.c" "nested_structs.c"  (package frama-c)  (package "frama-c-saida") )
   (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (run frama-c-wtests -brief "nested_structs.0.exec.wtests" "frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=nested_structs.out.c > \"nested_structs.0.res.log\" 2> \"nested_structs.0.err.log\"" ))
+(action (run frama-c-wtests -brief "nested_structs.0.exec.wtests" "frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl -solutionReconstruction:wp\" -saida-keep-tmp -saida-out=nested_structs.out.c > \"nested_structs.0.res.log\" 2> \"nested_structs.0.err.log\"" ))
 )
 (rule ; COMPARE TARGET #0 OF TEST #0 FOR TEST FILE "nested_structs.c"
   (alias nested_structs.0.exec.diff)
@@ -183,13 +183,13 @@
   (alias "nested_structs.0.exec")
   (deps  "nested_structs.c"  (package frama-c)  (package "frama-c-saida")  (universe))
   (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (with-accepted-exit-codes 0 (system "frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=nested_structs.out.c")))
+(action (with-accepted-exit-codes 0 (system "frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl -solutionReconstruction:wp\" -saida-keep-tmp -saida-out=nested_structs.out.c")))
 )
 (rule ; SHOW TEST COMMAND #0 OF TEST FILE "nested_structs.c"
   (alias "nested_structs.0.exec.show")
   (deps  "nested_structs.c"  (package frama-c)  (package "frama-c-saida")  (universe))
   (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (system "echo 'frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=nested_structs.out.c > \"nested_structs.0.res.log\" 2> \"nested_structs.0.err.log\"'"))
+(action (system "echo 'frama-c -check -no-autoload-plugins -load-plugin=saida    nested_structs.c -lib-entry -saida -saida-tricera-opts=\"-acsl -solutionReconstruction:wp\" -saida-keep-tmp -saida-out=nested_structs.out.c > \"nested_structs.0.res.log\" 2> \"nested_structs.0.err.log\"'"))
 )
 (rule
   (alias "nested_structs.0.exec.diff")
@@ -379,4 +379,3 @@
                  (echo "- \%{lib-available:frama-c-saida.core}: " %{lib-available:frama-c-saida.core} "\n")
   ))
 )
-

@@ -1,0 +1,7 @@
+{
+  "dir": "tests/basic/result",
+  "info": "EXECNOW #0 OF TEST FILE tests/basic/sum.c",
+  "cmd": "grep -q \"contract for sum\" sum.out.c && frama-c -check -no-autoload-plugins sum.out.c > sum.parse.log",
+  "log": [ "sum.parse.log" ],
+  "oracle_dir": "../oracle"
+}
