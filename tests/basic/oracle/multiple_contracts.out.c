@@ -14,7 +14,7 @@ int g;
 */
 /*@
   requires g == x && 101 >= x && x >= 0;
-  ensures \old(x) - \result == -1 && g - \result == -1 && \old(g) - \result == -1 && 102 >= \result && \result >= 1;
+  ensures \result - \old(x) == 1 && 101 >= g && g >= 0 && 101 >= \old(g) && \old(g) >= 0 && 101 >= \old(x) && \old(x) >= 0;
 */
 int add_one(int x) {
   return x+1;

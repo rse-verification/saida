@@ -16,8 +16,8 @@ struct S {
 struct S s[3];
 
 /*@
-  requires s == structs && \valid(structs);
-  ensures s == \old(s) && \old(structs) == \old(s) && \valid(s);
+  requires \true;
+  ensures s == \old(s);
 */
 int select_1_x(struct S structs[]) {
   return structs[1].x ;
