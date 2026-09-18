@@ -31,8 +31,15 @@ jobs:
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
-      - run: |
-          opam repo add rse-verification https://rse-verification.github.io/opam
+
+      - name: Set TriCera PP Path
+        run: echo "TRI_PP_PATH=$(opam var bin)" >> "$GITHUB_ENV"
+
+      - name: Add opam repositories
+        run: opam repo add rse-verification https://rse-verification.github.io/opam
+
+      - name: Build and install
+        run: |
           opam install . --deps-only
           opam exec -- why3 config detect
           opam exec -- dune build
