@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/implies.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    implies.c -lib-entry -main=func -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=implies.out.c > \"implies.0.res.log\" 2> \"implies.0.err.log\"",
+  "out": "implies.0.res.log",
+  "err": "implies.0.err.log",
+  "log": [ "implies.out.c", "saida_harness_implies.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/implies.0.res.oracle",
+  "oracle_err": "../oracle/implies.0.err.oracle"
+}

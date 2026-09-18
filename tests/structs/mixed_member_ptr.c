@@ -6,6 +6,7 @@
 /*
   Tests harness generation for nested structs in requires/ensures
   clauses is handled correctly.
+  This seems to expose a bug in TriCera, the generated contract is too weak.
  */
 
 struct Si {

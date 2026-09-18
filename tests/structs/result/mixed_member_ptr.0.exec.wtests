@@ -1,0 +1,11 @@
+{
+  "dir": "tests/structs/result",
+  "info": "TEST #0 OF TEST FILE tests/structs/mixed_member_ptr.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    mixed_member_ptr.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=mixed_member_ptr.out.c > \"mixed_member_ptr.0.res.log\" 2> \"mixed_member_ptr.0.err.log\"",
+  "out": "mixed_member_ptr.0.res.log",
+  "err": "mixed_member_ptr.0.err.log",
+  "log": [ "mixed_member_ptr.out.c", "saida_harness_mixed_member_ptr.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/mixed_member_ptr.0.res.oracle",
+  "oracle_err": "../oracle/mixed_member_ptr.0.err.oracle"
+}
