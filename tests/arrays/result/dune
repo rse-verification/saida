@@ -1,58 +1,6 @@
 (copy_files ../*.*)
 (alias (name runtest)
   (deps (alias runtest_config)))
-; TEST FILE "array-of-struct.c"
-(alias (name "array-of-struct.wtests")
-  (deps (alias "array-of-struct.0.exec.wtests"))) ; to performs all sub-tests related to a file
-(alias (name "array-of-struct.c")
-  (deps (alias "array-of-struct.0.exec"))) ; to reproduce and visualize the all sub-test outputs related to a file
-(rule ; TEST #0 OF TEST FILE tests/arrays/array-of-struct.c
-  (alias "array-of-struct.0.exec.wtests")
-  (targets "array-of-struct.0.err.log" "array-of-struct.0.res.log"  "array-of-struct.out.c" "saida_harness_array-of-struct.c" )
-  (deps "array-of-struct.0.exec.wtests" "../oracle/array-of-struct.0.res.oracle" "../oracle/array-of-struct.0.err.oracle"  "../oracle/array-of-struct.out.c" "../oracle/saida_harness_array-of-struct.c" "array-of-struct.c"  (package frama-c)  (package "frama-c-saida") )
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (run frama-c-wtests -brief "array-of-struct.0.exec.wtests" "frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c > \"array-of-struct.0.res.log\" 2> \"array-of-struct.0.err.log\"" ))
-)
-(rule ; COMPARE TARGET #0 OF TEST #0 FOR TEST FILE "array-of-struct.c"
-  (alias array-of-struct.0.exec.diff)
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/array-of-struct.out.c" "array-of-struct.out.c"))
-)
-(rule ; COMPARE TARGET #1 OF TEST #0 FOR TEST FILE "array-of-struct.c"
-  (alias array-of-struct.0.exec.diff)
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/saida_harness_array-of-struct.c" "saida_harness_array-of-struct.c"))
-)
-(rule ; REPRODUCE TEST #0 OF TEST FILE "array-of-struct.c"
-  (alias "array-of-struct.0.exec")
-  (deps  "array-of-struct.c"  (package frama-c)  (package "frama-c-saida")  (universe))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (with-accepted-exit-codes 0 (system "frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c")))
-)
-(rule ; SHOW TEST COMMAND #0 OF TEST FILE "array-of-struct.c"
-  (alias "array-of-struct.0.exec.show")
-  (deps  "array-of-struct.c"  (package frama-c)  (package "frama-c-saida")  (universe))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (system "echo 'frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c > \"array-of-struct.0.res.log\" 2> \"array-of-struct.0.err.log\"'"))
-)
-(rule
-  (alias "array-of-struct.0.exec.diff")
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/array-of-struct.0.res.oracle" "array-of-struct.0.res.log"))
-)
-(rule
-  (alias "array-of-struct.0.exec.diff")
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-(action (diff "../oracle/array-of-struct.0.err.oracle" "array-of-struct.0.err.log"))
-)
-(alias (name "array-of-struct.diff")
-  (deps (alias "array-of-struct.0.exec.diff"))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-)
-(alias (name "runtest_config")
-  (deps (alias "array-of-struct.diff"))
-  (enabled_if (and true %{lib-available:frama-c-saida.core}))
-)
 ; TEST FILE "nondet-init.c"
 (alias (name "nondet-init.wtests")
   (deps (alias "nondet-init.0.exec.wtests"))) ; to performs all sub-tests related to a file
@@ -103,6 +51,58 @@
 )
 (alias (name "runtest_config")
   (deps (alias "nondet-init.diff"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+)
+; TEST FILE "array-of-struct.c"
+(alias (name "array-of-struct.wtests")
+  (deps (alias "array-of-struct.0.exec.wtests"))) ; to performs all sub-tests related to a file
+(alias (name "array-of-struct.c")
+  (deps (alias "array-of-struct.0.exec"))) ; to reproduce and visualize the all sub-test outputs related to a file
+(rule ; TEST #0 OF TEST FILE tests/arrays/array-of-struct.c
+  (alias "array-of-struct.0.exec.wtests")
+  (targets "array-of-struct.0.err.log" "array-of-struct.0.res.log"  "array-of-struct.out.c" "saida_harness_array-of-struct.c" )
+  (deps "array-of-struct.0.exec.wtests" "../oracle/array-of-struct.0.res.oracle" "../oracle/array-of-struct.0.err.oracle"  "../oracle/array-of-struct.out.c" "../oracle/saida_harness_array-of-struct.c" "array-of-struct.c"  (package frama-c)  (package "frama-c-saida") )
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (run frama-c-wtests -brief "array-of-struct.0.exec.wtests" "frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c > \"array-of-struct.0.res.log\" 2> \"array-of-struct.0.err.log\"" ))
+)
+(rule ; COMPARE TARGET #0 OF TEST #0 FOR TEST FILE "array-of-struct.c"
+  (alias array-of-struct.0.exec.diff)
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (diff "../oracle/array-of-struct.out.c" "array-of-struct.out.c"))
+)
+(rule ; COMPARE TARGET #1 OF TEST #0 FOR TEST FILE "array-of-struct.c"
+  (alias array-of-struct.0.exec.diff)
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (diff "../oracle/saida_harness_array-of-struct.c" "saida_harness_array-of-struct.c"))
+)
+(rule ; REPRODUCE TEST #0 OF TEST FILE "array-of-struct.c"
+  (alias "array-of-struct.0.exec")
+  (deps  "array-of-struct.c"  (package frama-c)  (package "frama-c-saida")  (universe))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (with-accepted-exit-codes 0 (system "frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c")))
+)
+(rule ; SHOW TEST COMMAND #0 OF TEST FILE "array-of-struct.c"
+  (alias "array-of-struct.0.exec.show")
+  (deps  "array-of-struct.c"  (package frama-c)  (package "frama-c-saida")  (universe))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (system "echo 'frama-c -check -no-autoload-plugins -load-plugin=saida    array-of-struct.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=array-of-struct.out.c > \"array-of-struct.0.res.log\" 2> \"array-of-struct.0.err.log\"'"))
+)
+(rule
+  (alias "array-of-struct.0.exec.diff")
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (diff "../oracle/array-of-struct.0.res.oracle" "array-of-struct.0.res.log"))
+)
+(rule
+  (alias "array-of-struct.0.exec.diff")
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+(action (diff "../oracle/array-of-struct.0.err.oracle" "array-of-struct.0.err.log"))
+)
+(alias (name "array-of-struct.diff")
+  (deps (alias "array-of-struct.0.exec.diff"))
+  (enabled_if (and true %{lib-available:frama-c-saida.core}))
+)
+(alias (name "runtest_config")
+  (deps (alias "array-of-struct.diff"))
   (enabled_if (and true %{lib-available:frama-c-saida.core}))
 )
 (alias (name disabled_runtest)
