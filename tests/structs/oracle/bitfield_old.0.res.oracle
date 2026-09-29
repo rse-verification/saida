@@ -1,0 +1,5 @@
+[kernel] Parsing bitfield_old.c (with preprocessing)
+[kernel:typing:no-proto] bitfield_old.c:17: Warning: 
+  Function helper is declared without prototype.
+  Its formals will be inferred from actual arguments at first call.
+  Declare it as helper(void) if the function does not take any parameters.
