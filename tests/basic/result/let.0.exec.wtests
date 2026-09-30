@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/let.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    let.c -lib-entry -main=f -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=let.out.c > \"let.0.res.log\" 2> \"let.0.err.log\"",
+  "out": "let.0.res.log",
+  "err": "let.0.err.log",
+  "log": [ "saida_harness_let.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/let.0.res.oracle",
+  "oracle_err": "../oracle/let.0.err.oracle"
+}

@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/old_predicate.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    old_predicate.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=old_predicate.out.c > \"old_predicate.0.res.log\" 2> \"old_predicate.0.err.log\"",
+  "out": "old_predicate.0.res.log",
+  "err": "old_predicate.0.err.log",
+  "log": [ "old_predicate.out.c", "saida_harness_old_predicate.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/old_predicate.0.res.oracle",
+  "oracle_err": "../oracle/old_predicate.0.err.oracle"
+}

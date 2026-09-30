@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/bool_const.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    bool_const.c -lib-entry -main=func -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=bool_const.out.c > \"bool_const.0.res.log\" 2> \"bool_const.0.err.log\"",
+  "out": "bool_const.0.res.log",
+  "err": "bool_const.0.err.log",
+  "log": [ "bool_const.out.c", "saida_harness_bool_const.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/bool_const.0.res.oracle",
+  "oracle_err": "../oracle/bool_const.0.err.oracle"
+}

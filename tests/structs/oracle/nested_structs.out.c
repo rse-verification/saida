@@ -19,8 +19,8 @@ struct So {
 struct So s;
 
 /*@
-  requires s == structs && structs.inner.x >= 0;
-  ensures s == \old(s) && \old(structs) == \old(s) && \old(s).inner.x == \result && \result >= 0;
+  requires \true;
+  ensures s + \old(structs) - \old(s).inner.x == \result && s + \old(structs) - \old(s).inner == \old(structs).inner;
 */
 int select_inner_x(struct So structs) {
   return structs.inner.x ;

@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/simple_ptr.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    simple_ptr.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=simple_ptr.out.c > \"simple_ptr.0.res.log\" 2> \"simple_ptr.0.err.log\"",
+  "out": "simple_ptr.0.res.log",
+  "err": "simple_ptr.0.err.log",
+  "log": [ "simple_ptr.out.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/simple_ptr.0.res.oracle",
+  "oracle_err": "../oracle/simple_ptr.0.err.oracle"
+}

@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/multiple_contracts.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    multiple_contracts.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=multiple_contracts.out.c > \"multiple_contracts.0.res.log\" 2> \"multiple_contracts.0.err.log\"",
+  "out": "multiple_contracts.0.res.log",
+  "err": "multiple_contracts.0.err.log",
+  "log": [ "multiple_contracts.out.c", "saida_harness_multiple_contracts.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/multiple_contracts.0.res.oracle",
+  "oracle_err": "../oracle/multiple_contracts.0.err.oracle"
+}

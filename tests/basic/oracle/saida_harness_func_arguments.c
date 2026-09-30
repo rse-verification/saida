@@ -5,11 +5,6 @@
 */
 /*
   Tests harness generation with a base funtion with arguments.
-
-  TODO: Not supported yet.
-  This currently (2025-10-15) breaks because we need an outer
-  and an inner harness function to make sure that "old" values
-  exists for the arguments.
  */
 
 struct S {

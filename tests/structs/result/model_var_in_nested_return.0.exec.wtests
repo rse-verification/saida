@@ -1,0 +1,14 @@
+{
+  "dir": "tests/structs/result",
+  "info": "TEST #0 OF TEST FILE tests/structs/model_var_in_nested_return.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    model_var_in_nested_return.c -lib-entry -main=\"start\" -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=model_var_in_nested_return.out.c > \"model_var_in_nested_return.0.res.log\" 2> \"model_var_in_nested_return.0.err.log\"",
+  "out": "model_var_in_nested_return.0.res.log",
+  "err": "model_var_in_nested_return.0.err.log",
+  "log": [
+    "model_var_in_nested_return.out.c",
+    "saida_harness_model_var_in_nested_return.c"
+  ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/model_var_in_nested_return.0.res.oracle",
+  "oracle_err": "../oracle/model_var_in_nested_return.0.err.oracle"
+}

@@ -11,7 +11,10 @@
 int g_x;
 
 
-//No inferred contract found for step_towards_0
+/*@
+  requires x == g_x;
+  ensures (\old(x) != 0 || \result == 0) && (\result - \old(x) == 1 || \old(x) >= 0) && (\result - \old(x) == -1 || 0 >= \old(x));
+*/
 int step_towards_0(int x) {
     return (x < 0 
             ? x+1

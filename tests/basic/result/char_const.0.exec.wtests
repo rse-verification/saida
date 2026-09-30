@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/char_const.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    char_const.c -lib-entry -main=func -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=char_const.out.c > \"char_const.0.res.log\" 2> \"char_const.0.err.log\"",
+  "out": "char_const.0.res.log",
+  "err": "char_const.0.err.log",
+  "log": [ "char_const.out.c", "saida_harness_char_const.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/char_const.0.res.oracle",
+  "oracle_err": "../oracle/char_const.0.err.oracle"
+}

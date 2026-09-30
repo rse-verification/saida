@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/ternary_term.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    ternary_term.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=ternary_term.out.c > \"ternary_term.0.res.log\" 2> \"ternary_term.0.err.log\"",
+  "out": "ternary_term.0.res.log",
+  "err": "ternary_term.0.err.log",
+  "log": [ "ternary_term.out.c", "saida_harness_ternary_term.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/ternary_term.0.res.oracle",
+  "oracle_err": "../oracle/ternary_term.0.err.oracle"
+}

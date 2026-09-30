@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/sum.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    sum.c -lib-entry -saida -saida-tricera-opts=\"-acsl\" -saida-out=sum.out.c > \"sum.0.res.log\" 2> \"sum.0.err.log\"",
+  "out": "sum.0.res.log",
+  "err": "sum.0.err.log",
+  "log": [ "sum.out.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/sum.0.res.oracle",
+  "oracle_err": "../oracle/sum.0.err.oracle"
+}

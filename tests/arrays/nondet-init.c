@@ -5,6 +5,7 @@
 */
 /*
   Tests that nondeterministically initialized arrays are translated correctly.
+  NOTE: This program seems to expose a bug in TriCera, the generated contract is too weak.
  */
 int a[3];
 

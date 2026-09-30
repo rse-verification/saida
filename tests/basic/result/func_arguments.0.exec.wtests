@@ -1,0 +1,11 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/func_arguments.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    func_arguments.c -lib-entry -main=start -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=func_arguments.out.c > \"func_arguments.0.res.log\" 2> \"func_arguments.0.err.log\"",
+  "out": "func_arguments.0.res.log",
+  "err": "func_arguments.0.err.log",
+  "log": [ "func_arguments.out.c", "saida_harness_func_arguments.c" ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/func_arguments.0.res.oracle",
+  "oracle_err": "../oracle/func_arguments.0.err.oracle"
+}
