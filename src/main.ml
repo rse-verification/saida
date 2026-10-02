@@ -49,6 +49,11 @@ let function_has_contract contracted_fns name =
 let output_lines oc lines =
   List.iter (fun line -> output_string oc (line ^ "\n")) lines
 
+let output_blank_lines oc lines =
+  lines
+  |> List.filter (fun line -> String.trim line = "")
+  |> output_lines oc
+
 let pending_contract_should_be_preserved contracted_fns name =
   name <> Kernel.MainFunction.get () && function_has_contract contracted_fns name
 
@@ -91,6 +96,7 @@ let rec modify_acsl_annots ic oc acsl_state pending_acsl line fn_list contracted
        | (AcslOutside, AcslOutside) when pending_acsl <> [] && s' = "" ->
            modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
        | (AcslOutside, AcslOutside) ->
+           output_blank_lines oc pending_acsl;
            if (Str.string_match ghost_regex src_line 0) then
              (* Obvioulsy this will only work for single line comments. 
                 If e.g. ghost variable declarations are multi-line, this will fail. *)
