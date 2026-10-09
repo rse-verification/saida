@@ -13,6 +13,15 @@ struct S {
   int x;
 };
 
+
+struct S g_s;
+
+/*@contract@*/
+struct S id(struct S s) {
+  return s;
+}
+
+
 struct S start(void) {
   return id(g_s);
 }

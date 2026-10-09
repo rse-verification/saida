@@ -13,6 +13,19 @@ struct Si {
   int x;
 };
 
+
+struct So {
+  struct Si inner;
+};
+
+struct So s;
+
+/*@contract@*/
+int select_inner_x(struct So structs) {
+  return structs.inner.x ;
+}
+
+
 int main(void) {
   return select_inner_x(s);
 }

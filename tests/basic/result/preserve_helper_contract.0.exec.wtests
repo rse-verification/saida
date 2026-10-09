@@ -1,0 +1,14 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/preserve_helper_contract.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    preserve_helper_contract.c -lib-entry -main top -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=preserve_helper_contract.out.c > \"preserve_helper_contract.0.res.log\" 2> \"preserve_helper_contract.0.err.log\"",
+  "out": "preserve_helper_contract.0.res.log",
+  "err": "preserve_helper_contract.0.err.log",
+  "log": [
+    "preserve_helper_contract.out.c",
+    "saida_harness_preserve_helper_contract.c"
+  ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/preserve_helper_contract.0.res.oracle",
+  "oracle_err": "../oracle/preserve_helper_contract.0.err.oracle"
+}

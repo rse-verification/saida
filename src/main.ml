@@ -43,6 +43,20 @@ let line_to_fun_def fn_list n =
 let line_is_fun_def fn_list n =
   Option.is_some(line_to_fun_def fn_list n)
 
+let function_has_contract contracted_fns name =
+  List.mem name contracted_fns
+
+let output_lines oc lines =
+  List.iter (fun line -> output_string oc (line ^ "\n")) lines
+
+let output_blank_lines oc lines =
+  lines
+  |> List.filter (fun line -> String.trim line = "")
+  |> output_lines oc
+
+let pending_contract_should_be_preserved contracted_fns name =
+  name <> Kernel.MainFunction.get () && function_has_contract contracted_fns name
+
 
 (* acslState describes if inside multi-line acsl specification or not*)
 type acslState = 
@@ -52,7 +66,7 @@ type acslState =
 (*fn_list : [(name, loc)]contains a list of all function definitions and locations
     where name is string and loc is Cil_types.location
 *)
-let rec modify_acsl_annots ic oc acsl_state line fn_list =
+let rec modify_acsl_annots ic oc acsl_state pending_acsl line fn_list contracted_fns =
   let next_acsl_state cur_state str =
     match cur_state with
     | AcslOutside when Str.string_match acsl_start_regex str 0 -> AcslInside
@@ -64,55 +78,91 @@ let rec modify_acsl_annots ic oc acsl_state line fn_list =
   | Some src_line ->
       let s' = String.trim src_line in
       let acsl_state' = next_acsl_state acsl_state s' in
-      let mod_src_line =
-        match (acsl_state, acsl_state') with
-        | (AcslInside, AcslOutside) -> "\n"
-        | (AcslInside, AcslInside) -> ""
-        | (AcslOutside, AcslInside) -> ""
-        | (AcslOutside, AcslOutside) when line_is_fun_def fn_list line ->
-            (match get_fn_name s' with
-             | name when name = Kernel.MainFunction.get () -> src_line ^ "\n"
-             | name -> "/*@contract@*/\n" ^ src_line ^ "\n")
-        | (AcslOutside, AcslOutside) ->
-            if (Str.string_match ghost_regex src_line 0) then
-              (* Obvioulsy this will only work for single line comments. 
-                 If e.g. ghost variable declarations are multi-line, this will fail. *)
-              (Str.replace_first (Str.regexp "//@ ghost") "" src_line) ^ " //from ghost code\n"
-            else src_line^"\n"
-      in
-      output_string oc mod_src_line;
-      modify_acsl_annots ic oc acsl_state' (line+1) fn_list
+      (match (acsl_state, acsl_state') with
+       | (AcslOutside, AcslInside) ->
+           let acsl_state' =
+             if Str.string_match acsl_end_regex s' 0 then AcslOutside else AcslInside
+           in
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+       | (AcslInside, AcslInside) ->
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+       | (AcslInside, AcslOutside) ->
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+       | (AcslOutside, AcslOutside) when line_is_fun_def fn_list line ->
+           let name = get_fn_name s' in
+           if pending_contract_should_be_preserved contracted_fns name then
+             output_lines oc pending_acsl
+           else begin
+             if pending_acsl <> [] then output_string oc "\n";
+             output_blank_lines oc pending_acsl;
+             if name <> Kernel.MainFunction.get () then
+               output_string oc "/*@contract@*/\n"
+           end;
+           output_string oc (src_line ^ "\n");
+           modify_acsl_annots ic oc acsl_state' [] (line+1) fn_list contracted_fns
+       | (AcslOutside, AcslOutside) when pending_acsl <> [] && s' = "" ->
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+       | (AcslOutside, AcslOutside) ->
+           if pending_acsl <> [] then output_string oc "\n";
+           output_blank_lines oc pending_acsl;
+           if (Str.string_match ghost_regex src_line 0) then
+             (* Obvioulsy this will only work for single line comments. 
+                If e.g. ghost variable declarations are multi-line, this will fail. *)
+             output_string oc ((Str.replace_first (Str.regexp "//@ ghost") "" src_line) ^ " //from ghost code\n")
+           else
+             output_string oc (src_line^"\n");
+           modify_acsl_annots ic oc acsl_state' [] (line+1) fn_list contracted_fns)
 
 
 
 (*Takes buffer for the harness function and the original file name and merges*)
 (*File reading from Rosetta code ("read entire file")*)
-let source_w_harness source_fname hbuff fn_list dest_fname =
+let source_w_harness source_fname hbuff fn_list contracted_fns dest_fname =
+  (* Print the merged contract with its prototype: Frama-C may rename formals
+     across redeclarations, so attaching it to a raw prototype is unsafe. *)
+  let external_specs = List.filter_map (function
+    | Cil_types.GFunDecl (_, vi, ((start_pos, _) as loc))
+      when Filepath.equal (Filepos.path start_pos) (Filepath.of_string source_fname) ->
+        let kf = Globals.Functions.get vi in
+        let spec = Annotations.funspec kf in
+        if Kernel_function.is_definition kf || spec.spec_behavior = [] then None
+        else Some (vi.vid,
+          Kernel.Unicode.without_unicode
+            (Format.asprintf "%a@." Printer.pp_global)
+            (Cil_types.GFunDecl (spec, vi, loc)))
+    | _ -> None) (Ast.get ()).globals
+    |> List.sort_uniq (fun (id, _) (id', _) -> Int.compare id id')
+  in
   let source_chan = open_in source_fname in
   let dest_chan = open_out dest_fname in
-  modify_acsl_annots source_chan dest_chan AcslOutside 1 fn_list;
+  modify_acsl_annots source_chan dest_chan AcslOutside [] 1 fn_list contracted_fns;
+  (* Merged prototypes may use types declared after the first source prototype. *)
+  List.iter (fun (_, declaration) -> output_string dest_chan declaration) external_specs;
   Buffer.output_buffer dest_chan hbuff;
   close_in source_chan;
   close_out dest_chan
 
 
-let rec add_inferred_to_source ic buff ht line fn_list =
+let rec add_inferred_to_source ic buff ht line fn_list contracted_fns =
   match (try_read ic) with
     | Some s ->
       (match line_to_fun_def fn_list line with
         | Some(name, _) ->
-          (match Hashtbl.find_opt ht name with
-            | Some clist ->
-              List.iter (fun r -> Buffer.add_string buff (r ^ "\n")) clist;
-            | None ->
-              if (name <> (Kernel.MainFunction.get ())) then
-                Buffer.add_string buff ("//No inferred contract found for " ^ name ^ "\n")
-              else ()
-          )
+          if pending_contract_should_be_preserved contracted_fns name then
+            ()
+          else
+            (match Hashtbl.find_opt ht name with
+             | Some clist ->
+               List.iter (fun r -> Buffer.add_string buff (r ^ "\n")) clist;
+             | None ->
+               if (name <> (Kernel.MainFunction.get ())) then
+                 Buffer.add_string buff ("//No inferred contract found for " ^ name ^ "\n")
+               else ()
+            )
         | None -> ()
       );
       Buffer.add_string buff (s ^ "\n");
-      add_inferred_to_source ic buff ht (line+1) fn_list
+      add_inferred_to_source ic buff ht (line+1) fn_list contracted_fns
     | None -> ()
 
 
@@ -125,12 +175,12 @@ let run_wp_plugin filename =
 
 
 
-let merge_source_w_inferred source_file fn_list result_fname out_fname =
+let merge_source_w_inferred source_file fn_list contracted_fns result_fname out_fname =
   let contracts_hash = create_contracts_hash result_fname in
   let source_ic = open_in source_file in
   let n = in_channel_length source_ic in
   let buff = Buffer.create n in
-  let () = add_inferred_to_source source_ic buff contracts_hash 1 fn_list in
+  let () = add_inferred_to_source source_ic buff contracts_hash 1 fn_list contracted_fns in
   let () = close_in source_ic in
   let out_chan = open_out out_fname in
   let _ = Buffer.output_buffer out_chan buff in
@@ -168,6 +218,7 @@ let run () =
       List.find (fun i -> i.block.called_func == (Kernel.MainFunction.get_function_name ()))
       hf_list
     in
+    let contracted_fns = List.map (fun hf -> hf.block.called_func) hf_list in
     let harness_buff = Buffer.create 1000 in
     let fmt = Format.formatter_of_buffer harness_buff in
     Format.pp_set_margin fmt max_int;
@@ -185,14 +236,14 @@ let run () =
         let source_fname = Filepath.to_string head in
         let harness_fname = get_harness_fname (KeepTempFiles.get ()) source_fname in
         let result_fname = get_result_fname (KeepTempFiles.get ()) source_fname in
-        source_w_harness source_fname harness_buff fn_list harness_fname;
+        source_w_harness source_fname harness_buff fn_list contracted_fns harness_fname;
         ignore (run_tricera 
           (TriceraPath.get ())
           (Kernel.LibEntry.get ())
           harness_func.name
           (TriceraOptions.get ())
           harness_fname result_fname);
-        merge_source_w_inferred source_fname fn_list result_fname output_fname;
+        merge_source_w_inferred source_fname fn_list contracted_fns result_fname output_fname;
         if Run_wp.get () then
           let fname = output_fname
           in run_wp_plugin fname;

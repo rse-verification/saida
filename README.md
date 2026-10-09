@@ -51,6 +51,22 @@ Step 4: Merge the inferred contracts from step 3 with the source code
   (this result is stored in `saida.out` or file given by `-saida-out=<file>` option)  
 Step 5: (optional) Run the wp plugin on the result from step 4
 
+### Existing contracts
+
+Saida keeps existing helper contracts in the TriCera input and adds inference
+placeholders only for helpers without contracts. Contracts on external functions
+(declarations without a body) are taken from Frama-C's merged specification and
+printed once with a matching prototype after the original source and before the
+verification harness. This keeps later typedefs and global declarations in scope,
+including when redeclarations rename parameters or use a newly introduced typedef.
+The original source is not modified; existing helper contracts are not duplicated
+in the output file.
+
+An external contract is an assumption about code that is not available for
+verification, not a proof of its implementation. For subsequent Eva analysis,
+provide dependency information such as `assigns state \from value;` when needed.
+TriCera's supported ACSL subset still applies.
+
 ## Development
 
 A suitable development environment for the plugin is provided by the
@@ -59,6 +75,21 @@ A suitable development environment for the plugin is provided by the
 Please note that there are several `TODO` and `FIX ME` sprinkled around the code base.
 There are several test cases with `TODO` to indicate that their oracle file contains
 the result of an unsupported feature. 
+
+After adding tests, regenerate the ptest rules and run the comparisons:
+
+```sh
+frama-c-ptests -dune-alias runtest
+dune build @install
+dune test
+```
+
+`tests/basic/external_contract.c` reproduces issue #46. The related inline,
+redeclaration, declaration-order and negative tests check contract preservation.
+They require TriCera to report `SAFE` for valid callers and `UNSAFE` for the
+deliberately invalid caller.
+Some older tests intentionally record diagnostics for unsupported constructs;
+a passing ptest suite does not mean all those constructs are supported.
 
 ## Limitations
 The plugin is currently limited to programs/specifications following these rules:

@@ -19,6 +19,10 @@ void f() {
   i = any();
   t[i]++;
 }
+/*@ ensures 0 <= \result <= 9; */
+int any(void);
+
+
 void saida_harness_f_inner()
 {
   //Logic var declarations, e.g. from \forall or \exists

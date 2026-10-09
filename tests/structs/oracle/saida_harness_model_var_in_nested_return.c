@@ -14,6 +14,19 @@ struct Si {
   int x;
 };
 
+
+struct So {
+  struct Si inner;
+};
+
+struct So g_s;
+
+/*@contract@*/
+struct So id(struct So s) {
+  return s;
+}
+
+
 struct So start(void) {
   return id(g_s);
 }

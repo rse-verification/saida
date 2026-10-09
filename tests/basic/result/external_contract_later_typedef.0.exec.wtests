@@ -1,0 +1,15 @@
+{
+  "dir": "tests/basic/result",
+  "info": "TEST #0 OF TEST FILE tests/basic/external_contract_later_typedef.c",
+  "cmd": "frama-c -check -no-autoload-plugins -load-plugin=saida    external_contract_later_typedef.c -lib-entry -main bar -saida -saida-tricera-opts=\"-acsl\" -saida-keep-tmp -saida-out=external_contract_later_typedef.out.c > \"external_contract_later_typedef.0.res.log\" 2> \"external_contract_later_typedef.0.err.log\"",
+  "out": "external_contract_later_typedef.0.res.log",
+  "err": "external_contract_later_typedef.0.err.log",
+  "log": [
+    "external_contract_later_typedef.out.c",
+    "saida_harness_external_contract_later_typedef.c",
+    "saida_result_external_contract_later_typedef.c"
+  ],
+  "oracle_dir": "../oracle",
+  "oracle_out": "../oracle/external_contract_later_typedef.0.res.oracle",
+  "oracle_err": "../oracle/external_contract_later_typedef.0.err.oracle"
+}
