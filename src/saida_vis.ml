@@ -135,9 +135,14 @@ module HarnessPrinter = struct
         method private wrap_in_label : 'a. 
           Format.formatter -> logic_label -> logic_type -> (Format.formatter -> 'a -> unit) -> 'a -> unit = 
             fun fmt ll t f arg ->
+              (* The snapshot stores a scalar value, not a bitfield. Keep its
+                 base type, but omit the field width from the generated cast. *)
+              let cast_type = Logic_utils.logicCType (to_c_type t) in
+              let cast_type = Ast_types.remove_attributes
+                  [Ast_attributes.bitfield_attribute_name] cast_type in
               Format.fprintf fmt "$at(\"%a\", (%a)(%a))"
                   super#logic_label ll
-                  (self#typ None) (Logic_utils.logicCType (to_c_type t))
+                  (self#typ None) cast_type
                   f arg;
 
         (* Disallow TModel in offsets *)

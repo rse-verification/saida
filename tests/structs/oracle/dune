@@ -27,3 +27,8 @@
 (rule (target "model_var_in_nested_structs.out.c") (mode fallback) (action (write-file "model_var_in_nested_structs.out.c" "")))
 (rule (target "saida_harness_model_var_in_nested_structs.c") (mode fallback) (action (write-file "saida_harness_model_var_in_nested_structs.c" "")))
 
+(rule (target "bitfield_old.0.err.oracle") (mode fallback) (action (write-file "bitfield_old.0.err.oracle" "")))
+(rule (target "bitfield_old.0.res.oracle") (mode fallback) (action (write-file "bitfield_old.0.res.oracle" "")))
+(rule (target "bitfield_old.out.c") (mode fallback) (action (write-file "bitfield_old.out.c" "")))
+(rule (target "saida_harness_bitfield_old.c") (mode fallback) (action (write-file "saida_harness_bitfield_old.c" "")))
+(rule (target "saida_result_bitfield_old.c") (mode fallback) (action (write-file "saida_result_bitfield_old.c" "")))
