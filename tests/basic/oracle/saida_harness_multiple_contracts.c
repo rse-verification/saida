@@ -8,8 +8,10 @@
 */
 int g;
 
-
-/*@contract@*/
+/*@
+  requires -500 <= x <= 500;
+  ensures \result == x+1;
+*/
 int add_one(int x) {
   return x+1;
 }

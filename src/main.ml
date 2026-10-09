@@ -66,7 +66,7 @@ type acslState =
 (*fn_list : [(name, loc)]contains a list of all function definitions and locations
     where name is string and loc is Cil_types.location
 *)
-let rec modify_acsl_annots ic oc acsl_state pending_acsl line fn_list contracted_fns =
+let rec modify_acsl_annots ic oc acsl_state pending_acsl line fn_list contracted_fns external_specs =
   let next_acsl_state cur_state str =
     match cur_state with
     | AcslOutside when Str.string_match acsl_start_regex str 0 -> AcslInside
@@ -76,26 +76,36 @@ let rec modify_acsl_annots ic oc acsl_state pending_acsl line fn_list contracted
   match (try_read ic) with
   | None -> ()
   | Some src_line ->
+      List.iter (fun (decl_line, declaration) ->
+        if line = decl_line then output_string oc declaration) external_specs;
       let s' = String.trim src_line in
       let acsl_state' = next_acsl_state acsl_state s' in
       (match (acsl_state, acsl_state') with
        | (AcslOutside, AcslInside) ->
-           modify_acsl_annots ic oc acsl_state' [src_line] (line+1) fn_list contracted_fns
+           let acsl_state' =
+             if Str.string_match acsl_end_regex s' 0 then AcslOutside else AcslInside
+           in
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns external_specs
        | (AcslInside, AcslInside) ->
-           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns external_specs
        | (AcslInside, AcslOutside) ->
-           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns external_specs
        | (AcslOutside, AcslOutside) when line_is_fun_def fn_list line ->
            let name = get_fn_name s' in
            if pending_contract_should_be_preserved contracted_fns name then
              output_lines oc pending_acsl
-           else if name <> Kernel.MainFunction.get () then
-             output_string oc "/*@contract@*/\n";
+           else begin
+             if pending_acsl <> [] then output_string oc "\n";
+             output_blank_lines oc pending_acsl;
+             if name <> Kernel.MainFunction.get () then
+               output_string oc "/*@contract@*/\n"
+           end;
            output_string oc (src_line ^ "\n");
-           modify_acsl_annots ic oc acsl_state' [] (line+1) fn_list contracted_fns
+           modify_acsl_annots ic oc acsl_state' [] (line+1) fn_list contracted_fns external_specs
        | (AcslOutside, AcslOutside) when pending_acsl <> [] && s' = "" ->
-           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns
+           modify_acsl_annots ic oc acsl_state' (pending_acsl @ [src_line]) (line+1) fn_list contracted_fns external_specs
        | (AcslOutside, AcslOutside) ->
+           if pending_acsl <> [] then output_string oc "\n";
            output_blank_lines oc pending_acsl;
            if (Str.string_match ghost_regex src_line 0) then
              (* Obvioulsy this will only work for single line comments. 
@@ -103,16 +113,30 @@ let rec modify_acsl_annots ic oc acsl_state pending_acsl line fn_list contracted
              output_string oc ((Str.replace_first (Str.regexp "//@ ghost") "" src_line) ^ " //from ghost code\n")
            else
              output_string oc (src_line^"\n");
-           modify_acsl_annots ic oc acsl_state' [] (line+1) fn_list contracted_fns)
+           modify_acsl_annots ic oc acsl_state' [] (line+1) fn_list contracted_fns external_specs)
 
 
 
 (*Takes buffer for the harness function and the original file name and merges*)
 (*File reading from Rosetta code ("read entire file")*)
 let source_w_harness source_fname hbuff fn_list contracted_fns dest_fname =
+  (* Print the merged contract with its prototype: Frama-C may rename formals
+     across redeclarations, so attaching it to a raw prototype is unsafe. *)
+  let external_specs = List.filter_map (function
+    | Cil_types.GFunDecl (_, vi, ((start_pos, _) as loc))
+      when Filepath.equal (Filepos.path start_pos) (Filepath.of_string source_fname) ->
+        let kf = Globals.Functions.get vi in
+        let spec = Annotations.funspec kf in
+        if Kernel_function.is_definition kf || spec.spec_behavior = [] then None
+        else Some (Filepos.line start_pos,
+          Kernel.Unicode.without_unicode
+            (Format.asprintf "%a@." Printer.pp_global)
+            (Cil_types.GFunDecl (spec, vi, loc)))
+    | _ -> None) (Ast.get ()).globals
+  in
   let source_chan = open_in source_fname in
   let dest_chan = open_out dest_fname in
-  modify_acsl_annots source_chan dest_chan AcslOutside [] 1 fn_list contracted_fns;
+  modify_acsl_annots source_chan dest_chan AcslOutside [] 1 fn_list contracted_fns external_specs;
   Buffer.output_buffer dest_chan hbuff;
   close_in source_chan;
   close_out dest_chan

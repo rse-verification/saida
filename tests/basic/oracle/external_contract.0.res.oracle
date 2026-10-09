@@ -1,0 +1,5 @@
+[kernel] Parsing external_contract.c (with preprocessing)
+[kernel:typing:no-proto] external_contract.c:13: Warning: 
+  Function foo is declared without prototype.
+  Its formals will be inferred from actual arguments at first call.
+  Declare it as foo(void) if the function does not take any parameters.

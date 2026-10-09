@@ -13,6 +13,15 @@ struct S {
   int x;
 };
 
+
+struct S s;
+
+/*@contract@*/
+int select_x(struct S structs) {
+  return structs.x ;
+}
+
+
 int main(void) {
   return select_x(s);
 }

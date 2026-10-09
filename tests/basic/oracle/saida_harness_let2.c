@@ -10,6 +10,10 @@ int i;
 int t[10];
 int *p = t;
 
+/*@ ensures 0 <= \result <= 9; */
+int any(void);
+
+
 //@ ensures 0 <= \result <= 9;
 int any(void);
 

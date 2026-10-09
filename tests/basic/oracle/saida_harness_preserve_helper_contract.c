@@ -21,6 +21,7 @@ int f2(int x) {
   return 1;
 }
 
+
 int top(int x) {
   return f1(x) + f2(x);
 }
