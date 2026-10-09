@@ -6,12 +6,6 @@
 */
 /* A contract may be attached to a later declaration with different formals. */
 int a;
-/*@ ensures a == \old(value);
-    assigns a;
-    assigns a \from value; */
-extern void set(int value);
-
-
 extern void set(int original);
 
 
@@ -26,6 +20,12 @@ void helper(void) {
 void bar() {
     helper();
 }
+/*@ ensures a == \old(value);
+    assigns a;
+    assigns a \from value; */
+extern void set(int value);
+
+
 void saida_harness_bar_inner()
 {
   

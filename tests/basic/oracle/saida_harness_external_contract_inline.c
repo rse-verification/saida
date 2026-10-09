@@ -7,12 +7,6 @@
 /* Single-line contracts, a multiline declaration and renamed formals. */
 int a;
 
-/*@ ensures a == \old(renamed);
-    assigns a;
-    assigns a \from renamed; */
-extern void set(int renamed);
-
-
 
 extern void set(
     int value);
@@ -22,6 +16,12 @@ extern void set(int renamed);
 void bar() {
     set(1);
 }
+/*@ ensures a == \old(renamed);
+    assigns a;
+    assigns a \from renamed; */
+extern void set(int renamed);
+
+
 void saida_harness_bar_inner()
 {
   

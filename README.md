@@ -56,7 +56,9 @@ Step 5: (optional) Run the wp plugin on the result from step 4
 Saida keeps existing helper contracts in the TriCera input and adds inference
 placeholders only for helpers without contracts. Contracts on external functions
 (declarations without a body) are taken from Frama-C's merged specification and
-printed with a matching prototype, including when redeclarations rename parameters.
+printed once with a matching prototype after the original source and before the
+verification harness. This keeps later typedefs and global declarations in scope,
+including when redeclarations rename parameters or use a newly introduced typedef.
 The original source is not modified; existing helper contracts are not duplicated
 in the output file.
 
@@ -83,8 +85,9 @@ dune test
 ```
 
 `tests/basic/external_contract.c` reproduces issue #46. The related inline,
-redeclaration and negative tests check contract preservation and require TriCera
-to report `SAFE` for valid callers and `UNSAFE` for the deliberately invalid caller.
+redeclaration, declaration-order and negative tests check contract preservation.
+They require TriCera to report `SAFE` for valid callers and `UNSAFE` for the
+deliberately invalid caller.
 Some older tests intentionally record diagnostics for unsupported constructs;
 a passing ptest suite does not mean all those constructs are supported.
 

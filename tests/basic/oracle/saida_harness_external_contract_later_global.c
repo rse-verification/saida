@@ -4,34 +4,34 @@
    LOG: saida_result_@PTEST_NAME@.c
    OPT: -lib-entry -main bar -saida -saida-tricera-opts="-acsl" -saida-keep-tmp -saida-out=@PTEST_NAME@.out.c
 */
-/* Reproducer from https://github.com/rse-verification/saida/issues/46. */
+/* A merged contract must follow its global declarations and appear once. */
+extern void set(int value);
 int a;
 
 
-extern void foo();
+extern void set(int value);
 
 
-void bar() {
-    foo();
+void bar(void) {
+    set(1);
 }
-/*@ requires a >= 0;
-    requires a < 1000;
-    ensures a == \old(a) + 1; */
-extern void foo(void);
+/*@ ensures a == \old(value);
+    assigns a;
+    assigns a \from value; */
+extern void set(int value);
 
 
 void saida_harness_bar_inner()
 {
   
   //The requires-clauses translated into assumes
-  assume(a >= 0);
-  assume(a < 1000);
+  assume(a == 0);
   
   //Function call that the harness function verifies
   bar();
   
   //The ensures-clauses translated into asserts
-  assert(a == $at("Old", (int)(a)) + 1);
+  assert(a == 1);
   
 }
 void saida_harness_bar()
